@@ -12,6 +12,7 @@ use crate::operations::obtain_pid_process::ObtainPidProcess;
 
 mod process;
 mod operations;
+mod eve;
 
 fn main() {
 
