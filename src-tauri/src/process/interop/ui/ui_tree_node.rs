@@ -1,4 +1,5 @@
 ﻿use std::collections::HashMap;
+use std::rc::Rc;
 use serde::{Serialize, Deserialize};
 
 #[derive(Debug)]
@@ -7,7 +8,7 @@ pub struct UiTreeNode {
     pub object_type_name: String,
     pub dict_entries_of_interest: HashMap<String, Box<dyn std::any::Any>>,
     pub other_dict_entries_keys: Option<Vec<String>>,
-    pub children: Option<Vec<UiTreeNode>>,
+    pub children: Vec<Rc<UiTreeNode>>,
 }
 
 #[derive(Debug)]
@@ -16,12 +17,11 @@ pub struct Bunch {
 }
 
 impl UiTreeNode {
-    pub fn enumerate_self_and_descendants(&self) -> Vec<&UiTreeNode> {
-        let mut result = vec![self];
-        if let Some(children) = &self.children {
-            for child in children {
-                result.extend(child.enumerate_self_and_descendants());
-            }
+    pub fn enumerate_self_and_descendants(&self) -> Vec<&Rc<UiTreeNode>> {
+        let mut result:Vec<&Rc<UiTreeNode>> = Vec::new();
+        let test = &self.children;
+        for child in  test {
+            result.extend(child.enumerate_self_and_descendants())
         }
         result
     }
@@ -31,7 +31,7 @@ impl UiTreeNode {
         object_type_name: String,
         dict_entries_of_interest: HashMap<String, Box<dyn std::any::Any>>,
         other_dict_entries_keys: Option<Vec<String>>,
-        children: Option<Vec<UiTreeNode>>,
+        children: Vec<Rc<UiTreeNode>>,
     ) -> UiTreeNode {
         UiTreeNode {
             object_address,

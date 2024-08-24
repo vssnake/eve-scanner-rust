@@ -1,15 +1,13 @@
-﻿use std::cell::RefCell;
+﻿use std::any::Any;
 use crate::eve::ui::common::common::{ChildOfNodeWithDisplayRegion, ChildWithRegion, ChildWithoutRegion, DisplayRegion, UITreeNodeWithDisplayRegion};
+use crate::process::interop::ui::ui_tree_node::UiTreeNode;
 use lazy_static::lazy_static;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
-use crate::eve::ui::ui_constants::{UiConstants, UiZonesEnum};
-use crate::process::interop::ui::ui_tree_node::UiTreeNode;
-
-
+use crate::process::interop::memory::python_models::LongInt;
 
 pub fn get_display_region_from_dict_entries(
-    entries_of_interest: &HashMap<String, serde_json::Value>,
+    entries_of_interest: &HashMap<String, Box<dyn Any>>,
 ) -> Option<DisplayRegion> {
     let display_x = fixed_number_from_property_name("_displayX", entries_of_interest);
     let display_y = fixed_number_from_property_name("_displayY", entries_of_interest);
@@ -32,7 +30,7 @@ pub fn get_display_region_from_dict_entries(
     None
 }
 
-pub fn get_display_region_from_ui_node(ui_node: &UiTreeNode) -> Option<DisplayRegion> {
+pub fn get_display_region_from_ui_node(ui_node: &Rc<UiTreeNode>) -> Option<DisplayRegion> {
     let display_x = fixed_number_from_ui_node("_displayX", ui_node);
     let display_y = fixed_number_from_ui_node("_displayY", ui_node);
     let display_width = fixed_number_from_ui_node("_displayWidth", ui_node);
@@ -50,24 +48,22 @@ pub fn get_display_region_from_ui_node(ui_node: &UiTreeNode) -> Option<DisplayRe
     None
 }
 
-fn fixed_number_from_ui_node(property_name: &str, ui_node: &UiTreeNode) -> Option<i32> {
+fn fixed_number_from_ui_node(property_name: &str, ui_node: &Rc<UiTreeNode>) -> Option<i32> {
     ui_node
         .dict_entries_of_interest
         .get(property_name)
         .and_then(|boxed_any| {
-            boxed_any
-                .downcast_ref::<serde_json::Value>() // Intenta hacer downcast a &serde_json::Value
-                .and_then(|json_value| extract_int_from_int_or_string(json_value))
+            extract_int_from_int_or_string(boxed_any)
         })
 }
 
 
 
-pub fn as_ui_tree_node_with_inherited_offset<'a>(
+pub fn as_ui_tree_node_with_inherited_offset(
     inherited_offset: (i32, i32),
     occluded_regions: &mut Vec<DisplayRegion>,
-    raw_node: &'a UiTreeNode,
-) -> Rc<RefCell<dyn ChildOfNodeWithDisplayRegion<'a> + 'a>> {
+    raw_node: &Rc<UiTreeNode>,
+) -> Rc<dyn ChildOfNodeWithDisplayRegion> {
     if let Some(self_region) = get_display_region_from_ui_node(&raw_node) {
         let total_display_region = DisplayRegion {
             x: self_region.x + inherited_offset.0,
@@ -82,41 +78,37 @@ pub fn as_ui_tree_node_with_inherited_offset<'a>(
             &total_display_region,
             occluded_regions,
         );
-        let child_of_node: Rc<RefCell<dyn ChildOfNodeWithDisplayRegion>> = Rc::new(RefCell::new(ChildWithRegion {
+        let child_of_node = Rc::new(ChildWithRegion {
             node: tree_node_with_display_region,
-        }));
+        });
         child_of_node
     } else {
-        let child_of_node: Rc<RefCell<dyn ChildOfNodeWithDisplayRegion>> = Rc::new(RefCell::new(ChildWithoutRegion {
-            node: raw_node,
-        }));
+        let child_of_node = Rc::new(ChildWithoutRegion {
+            node: Rc::clone(raw_node),
+        });
         child_of_node
     }
 }
 
-pub fn parse_child_of_node_with_display_region<'a>(
-    ui_tree_node: &'a UiTreeNode,
+pub fn parse_child_of_node_with_display_region(
+    ui_tree_node: &Rc<UiTreeNode>,
     self_display_region: &DisplayRegion,
     total_display_region: &DisplayRegion,
     occluded_regions: &mut Vec<DisplayRegion>,
-) -> UITreeNodeWithDisplayRegion<'a> {
-    let mut mapped_siblings: Vec<Rc<RefCell<dyn ChildOfNodeWithDisplayRegion>>> = Vec::new();
+) -> UITreeNodeWithDisplayRegion {
+    let mut mapped_siblings: Vec<Rc<dyn ChildOfNodeWithDisplayRegion>> = Vec::new();
     let mut occluded_regions_from_siblings: Vec<DisplayRegion> = Vec::new();
 
-    let test_flatten = ui_tree_node.children.iter().flatten();
-    for child in test_flatten {
+    for x in &ui_tree_node.children {
         let child_result = as_ui_tree_node_with_inherited_offset(
             (total_display_region.x, total_display_region.y),
             &mut occluded_regions_from_siblings,
-            child,
+            x,
         );
 
-
-        if let child_with_region = just_case_with_display_region(&child_result) {
-
-           let data =child_with_region.unwrap();
-            mapped_siblings.insert(0, Rc::clone(&child_result));
-            let descendants_with_display_region: Vec<&'a ChildWithRegion> = list_descendants_with_display_region(data.node.children.as_ref());
+        if let Some(child_with_region) = just_case_with_display_region(&child_result) {
+            mapped_siblings.push(child_result);
+            let descendants_with_display_region: Vec<Rc<ChildWithRegion>> = list_descendants_with_display_region(&child_with_region.node.children);
             let new_occluded_regions = descendants_with_display_region
                 .iter()
                 .filter(|cwr| node_occludes_following_nodes(&cwr.node))
@@ -129,22 +121,22 @@ pub fn parse_child_of_node_with_display_region<'a>(
         }
     }
 
+
     mapped_siblings.reverse();
     let total_display_region_visible = DisplayRegion { x: -1, y: -1, width: 0, height: 0 };
 
     UITreeNodeWithDisplayRegion {
-        ui_node: ui_tree_node,
-        children: Option::from(mapped_siblings),
+        ui_node: Rc::clone(ui_tree_node),
+        children: mapped_siblings,
         self_display_region: self_display_region.clone(),
         total_display_region: total_display_region.clone(),
         total_display_region_visible,
     }
 }
 
-pub fn just_case_with_display_region<'a>(
-    child: &Rc<RefCell<dyn ChildOfNodeWithDisplayRegion<'a> + 'a>>,
-) -> Option<&'a ChildWithRegion<'a>> {
-
+pub fn just_case_with_display_region(
+    child: &Rc<dyn ChildOfNodeWithDisplayRegion>,
+) -> Option<Rc<ChildWithRegion>> {
     None
 }
 
@@ -157,12 +149,12 @@ pub fn node_occludes_following_nodes(node: &UITreeNodeWithDisplayRegion) -> bool
     known_occluding_types.contains(&node.ui_node.object_type_name.as_str())
 }
 
-pub fn list_descendants_in_ui_tree_node(parent: &UiTreeNode) -> Vec<&UiTreeNode> {
-    let mut descendants: Vec<&UiTreeNode> = Vec::new();
+pub fn list_descendants_in_ui_tree_node(children:Vec<Rc<UiTreeNode>>) -> Vec<Rc<UiTreeNode>> {
+    let mut descendants: Vec<Rc<UiTreeNode>> = Vec::new();
 
-    for child in parent.children.iter().flatten() {
-        descendants.push(child);
-        descendants.extend(list_descendants_in_ui_tree_node(child));
+    for child in children {
+        descendants.push(Rc::clone(&child));
+        descendants.extend(list_descendants_in_ui_tree_node(child.children.iter().map(|c| Rc::clone(c)).collect()));
     }
 
     descendants
@@ -170,66 +162,56 @@ pub fn list_descendants_in_ui_tree_node(parent: &UiTreeNode) -> Vec<&UiTreeNode>
 
 fn fixed_number_from_property_name(
     property_name: &str,
-    entries_of_interest: &HashMap<String, serde_json::Value>,
+    entries_of_interest: &HashMap<String, Box<dyn Any>>,
 ) -> Option<i32> {
     entries_of_interest
         .get(property_name)
         .and_then(|json_value| extract_int_from_int_or_string(json_value))
 }
 
-pub fn list_descendants_with_display_region<'a>(
-    children_of_node: Option<&'a Vec<Rc<RefCell<dyn ChildOfNodeWithDisplayRegion<'a> + 'a>>>>,
-) -> Vec<&'a ChildWithRegion<'a>> {
-    let mut all_descendants: Vec<&'a ChildWithRegion<'a>> = Vec::new();
+pub fn list_descendants_with_display_region(
+    children: &Vec<Rc<dyn ChildOfNodeWithDisplayRegion>>,
+) -> Vec<Rc<ChildWithRegion>> {
+    let mut all_descendants: Vec<Rc<ChildWithRegion>> = Vec::new();
 
-
-    let children_with_regions: Vec<&'a ChildWithRegion<'a>> = if let Some(children) = children_of_node {
-        list_children_with_display_region(Some(children))
-    } else {
-        Vec::new()
-    };
+    let children_with_regions: Vec<Rc<ChildWithRegion>> = list_children_with_display_region(children);
 
     for child_with_region in children_with_regions.iter() {
 
-        all_descendants.push(child_with_region);
+        all_descendants.push(Rc::clone(child_with_region));
 
         // Recurse to get the descendants of the current child
-        let descendants = list_descendants_with_display_region(child_with_region.node.children.as_ref());
+        let descendants = list_descendants_with_display_region(&child_with_region.node.children);
         all_descendants.extend(descendants);
     }
 
     all_descendants
 }
 
-pub fn list_children_with_display_region<'a>(
-    children_of_node: Option<&'a Vec<Rc<RefCell<dyn ChildOfNodeWithDisplayRegion<'a> + 'a>>>>,
-) -> Vec<&'a ChildWithRegion<'a>> {
-    if let Some(children) = children_of_node {
-        children
-            .iter()
-            .filter_map(|child| just_case_with_display_region(child))
-            .collect()
-    } else {
-        Vec::new()
-    }
+pub fn list_children_with_display_region(
+    children_of_node: &Vec<Rc<dyn ChildOfNodeWithDisplayRegion>>,
+) -> Vec<Rc<ChildWithRegion>> {
+    children_of_node.iter().filter_map(|child| just_case_with_display_region(child)).collect()
 }
 
 
 
-fn extract_int_from_int_or_string(object_value: &serde_json::Value) -> Option<i32> {
-    match object_value {
-        serde_json::Value::Number(num) => num.as_i64().map(|n| n as i32),
-        serde_json::Value::String(string_value) => {
-            if let Ok(parsed_int) = string_value.parse::<i32>() {
-                Some(parsed_int)
-            } else {
-                // Log o manejo del error si falla la conversión
-                println!("Failed to parse integer from string '{}'", string_value);
-                None
-            }
+fn extract_int_from_int_or_string(object_value: &Box<dyn Any>) -> Option<i32> {
+    if let Some(long_int) = object_value.downcast_ref::<LongInt>() {
+        return Some(long_int.int_low32);
+    } else if let Some(&int_value) = object_value.downcast_ref::<i32>() {
+        return Some(int_value);
+    } else if let Some(string_value) = object_value.downcast_ref::<String>() {
+        if let Ok(parsed_int) = string_value.parse::<i32>() {
+            return Some(parsed_int);
+        } else {
+            // Log or handle error if parsing fails
+            println!("Failed to parse integer from string '{}'", string_value);
         }
-        _ => None,
     }
+
+    // Return None if the value cannot be decoded
+    None
 }
 
 

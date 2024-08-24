@@ -1,4 +1,5 @@
 ﻿use std::collections::{HashMap, HashSet};
+use std::rc::Rc;
 use lazy_static::lazy_static;
 use crate::eve::ui::common::common;
 use crate::eve::ui::common::common::UITreeNodeWithDisplayRegion;
@@ -14,7 +15,7 @@ impl UiConstants {
         overview_window
     }
 
-    pub fn initialize_mapper<'a>() -> HashMap<UiZonesEnum, Vec<&'a UITreeNodeWithDisplayRegion<'a>>> {
+    pub fn initialize_mapper() -> HashMap<UiZonesEnum, Vec<Rc<UITreeNodeWithDisplayRegion>>> {
         let mut mapper = HashMap::new();
         mapper.insert(UiZonesEnum::Overview, Vec::new());
         mapper

@@ -6,20 +6,21 @@ use crate::process::interop::memory::python_models::{
 use crate::process::interop::memory::windows_memory_reader::WindowsMemoryReader;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::rc::Rc;
 use std::sync::Arc;
 
-pub struct PythonMemoryReader<'a> {
-    memory_reader: &'a WindowsMemoryReader,
+pub struct PythonMemoryReader {
+    memory_reader: Rc<WindowsMemoryReader>,
     cache: MemoryReadingCache,
 }
 
-impl PythonMemoryReader<'_> {
+impl PythonMemoryReader {
     pub fn new(
-        windows_memory_reader: &WindowsMemoryReader,
+        windows_memory_reader: &Rc<WindowsMemoryReader>,
         memory_reading_cache: MemoryReadingCache,
     ) -> Self {
         Self {
-            memory_reader: windows_memory_reader,
+            memory_reader: Rc::clone(windows_memory_reader),
             cache: memory_reading_cache,
         }
     }
@@ -112,7 +113,7 @@ impl PythonMemoryReader<'_> {
         Some(String::from_utf8_lossy(&string_bytes).into_owned())
     }
 
-    pub fn reading_from_python_type_unicode(&self, address: u64) -> Option<String> {
+    pub fn reading_from_python_type_unicode(&self, address: u64) -> Option<Rc<String>> {
         let python_object_memory_size: usize = 32; // 0x20 in hex
         let unicode_string_length_offset: usize = 16; // 0x10 in hex
         let unicode_string_max_length: u64 = 4096; // 0x1000 in hex
@@ -152,10 +153,10 @@ impl PythonMemoryReader<'_> {
             return None; // Failed to read string bytes
         }
 
-        Some(String::from_utf8_lossy(&string_bytes).into_owned())
+        Some(Rc::new(String::from_utf8_lossy(&string_bytes).into_owned()))
     }
 
-    pub fn reading_from_python_type_bool(&self, address: u64) -> Option<bool> {
+    pub fn reading_from_python_type_bool(&self, address: u64) -> Option<Rc<bool>> {
         let python_object_memory_size: usize = 24; // 0x18 in hex
         let boolean_value_offset: usize = 16; // 0x10 in hex
 
@@ -173,10 +174,10 @@ impl PythonMemoryReader<'_> {
                 .ok()?,
         );
 
-        Some(boolean_value != 0)
+        Some(Rc::new(boolean_value != 0))
     }
 
-    pub fn read_python_float_object_value(&self, float_object_address: u64) -> Option<f64> {
+    pub fn read_python_float_object_value(&self, float_object_address: u64) -> Option<Rc<f64>> {
         //  https://github.com/python/cpython/blob/362ede2232107fc54d406bb9de7711ff7574e1d4/Include/floatobject.h
 
         let python_object_memory_size: usize = 32; // 0x20 in hex
@@ -196,7 +197,7 @@ impl PythonMemoryReader<'_> {
                 .ok()?,
         );
 
-        Some(float_value)
+        Some(Rc::new(float_value))
     }
 
     pub fn read_python_string_value_max_length_4000(
@@ -222,7 +223,7 @@ impl PythonMemoryReader<'_> {
 
         let mut result = HashMap::new();
 
-        for entry in dictionary_entries.unwrap() {
+        for entry in dictionary_entries.unwrap().iter() {
             if let Some(key) = self.read_python_string_value_max_length_4000(entry.key) {
                 result.insert(key, entry.value);
             }
@@ -234,7 +235,7 @@ impl PythonMemoryReader<'_> {
     pub fn read_active_dictionary_entries_from_dictionary_address(
         &self,
         dictionary_address: u64,
-    ) -> Option<Vec<PyDictEntry>> {
+    ) -> Option<Rc<Vec<PyDictEntry>>> {
         let dict_memory_size: usize = 48; // 0x30 in hex
 
         /*
@@ -292,7 +293,7 @@ impl PythonMemoryReader<'_> {
             }
         }
 
-        Some(entries)
+        Some(Rc::new(entries))
     }
 
     pub fn get_dict_entry_value_representation(
@@ -306,20 +307,31 @@ impl PythonMemoryReader<'_> {
 
                 let generic_representation = Box::new(DictEntryValueGenericRepresentation {
                     address: value_object_address,
-                    python_object_type_name: value_python_type_name.clone(),
+                    python_object_type_name: None,
                 }) as Box<dyn std::any::Any>;
 
-                if value_python_type_name.is_none() {
-                    return Some(Arc::from(generic_representation));
+                match value_python_type_name {
+                    None => {
+                        return None
+                    }
+                    _ => {}
                 }
 
-                let specialized_representation = self.specialized_reading_from_python_type(
+                //TODO remove this when all work is done
+                /*if value_python_type_name.is_none() {
+                    return Some(Rc::new(generic_representation));
+                }*/
+
+
+                //TODO implement specialized_reading_from_python_type
+                /*let specialized_representation = self.specialized_reading_from_python_type(
                     value_object_address,
                     &value_python_type_name.unwrap(),
-                );
+                );*/
+                let specialized_representation = None;
 
                 if specialized_representation.is_none() {
-                    return Some(Arc::from(generic_representation));
+                    return Some(Arc::new(generic_representation));
                 }
 
                 specialized_representation

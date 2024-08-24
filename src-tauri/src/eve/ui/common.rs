@@ -42,16 +42,16 @@
     }
 
 
-    pub trait ChildOfNodeWithDisplayRegion<'a> {
+    pub trait ChildOfNodeWithDisplayRegion {
         fn has_region(&self) -> bool;
-        fn as_any(&'a self) -> &dyn Any;
+        fn as_any(& self) -> &dyn Any;
     }
 
-    pub struct ChildWithRegion<'a> {
-        pub node: UITreeNodeWithDisplayRegion<'a>,
+    pub struct ChildWithRegion {
+        pub node: UITreeNodeWithDisplayRegion,
     }
 
-    impl<'a> ChildOfNodeWithDisplayRegion<'a> for ChildWithRegion<'a> {
+    impl ChildOfNodeWithDisplayRegion for ChildWithRegion {
         fn has_region(&self) -> bool {
             true
         }
@@ -60,11 +60,7 @@
         }
     }
 
-    pub struct ChildWithoutRegion<'a> {
-        pub node: &'a UiTreeNode,
-    }
-
-    impl<'a> ChildOfNodeWithDisplayRegion<'a> for ChildWithoutRegion<'a> {
+    impl ChildOfNodeWithDisplayRegion for ChildWithoutRegion {
         fn has_region(&self) -> bool {
             false
         }
@@ -73,25 +69,23 @@
         }
     }
 
-    pub struct UITreeNodeWithDisplayRegion<'a> {
-        pub ui_node: &'a UiTreeNode,
-        pub children: Option<Vec<Rc<RefCell<dyn ChildOfNodeWithDisplayRegion<'a> +'a>>>>,
+    pub struct ChildWithoutRegion {
+        pub node: Rc<UiTreeNode>,
+    }
+
+    pub struct UITreeNodeWithDisplayRegion {
+        pub ui_node: Rc<UiTreeNode>,
+        pub children: Vec<Rc<dyn ChildOfNodeWithDisplayRegion>>,
         pub self_display_region: DisplayRegion,
         pub total_display_region: DisplayRegion,
         pub total_display_region_visible: DisplayRegion,
     }
 
-    impl<'a> UITreeNodeWithDisplayRegion<'a> {
-
-        pub fn search_and_add_ui_zone_in_node(&'a self, ui_zones: &mut HashMap<&'a UiZonesEnum, Vec<&'a UITreeNodeWithDisplayRegion<'a>>>) {
-            if let Some(zone) = UI_ZONES.get(&self.ui_node.object_type_name.as_str()) {
-                ui_zones.entry(zone).or_insert_with(Vec::new).push(self);
-            }
-        }
+    impl UITreeNodeWithDisplayRegion {
     }
 
-    pub struct ScrollControls<'a> {
-        pub ui_node: &'a UITreeNodeWithDisplayRegion<'a>,
-        pub scroll_handle: Option<&'a UITreeNodeWithDisplayRegion<'a>>,
+    pub struct ScrollControls {
+        pub ui_node:  Rc<UITreeNodeWithDisplayRegion>,
+        pub scroll_handle: Option<Rc<UITreeNodeWithDisplayRegion>>
     }
 }
