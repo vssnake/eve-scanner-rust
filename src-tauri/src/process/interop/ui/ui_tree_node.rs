@@ -7,7 +7,7 @@ pub struct UiTreeNode {
     pub object_address: u64,
     pub object_type_name: String,
     pub dict_entries_of_interest: HashMap<String, Box<dyn std::any::Any>>,
-    pub other_dict_entries_keys: Option<Vec<String>>,
+    pub other_dict_entries_keys: Vec<String>,
     pub children: Vec<Rc<UiTreeNode>>,
 }
 
@@ -30,7 +30,7 @@ impl UiTreeNode {
         object_address: u64,
         object_type_name: String,
         dict_entries_of_interest: HashMap<String, Box<dyn std::any::Any>>,
-        other_dict_entries_keys: Option<Vec<String>>,
+        other_dict_entries_keys: Vec<String>,
         children: Vec<Rc<UiTreeNode>>,
     ) -> UiTreeNode {
         UiTreeNode {

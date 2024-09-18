@@ -61,20 +61,20 @@ fn fixed_number_from_ui_node(property_name: &str, ui_node: &Rc<UiTreeNode>) -> O
 
 pub fn as_ui_tree_node_with_inherited_offset(
     inherited_offset: (i32, i32),
-    occluded_regions: &mut Vec<DisplayRegion>,
+    occluded_regions: &mut Vec<Rc<DisplayRegion>>,
     raw_node: &Rc<UiTreeNode>,
 ) -> Rc<dyn ChildOfNodeWithDisplayRegion> {
     if let Some(self_region) = get_display_region_from_ui_node(&raw_node) {
-        let total_display_region = DisplayRegion {
+        let total_display_region = Rc::new(DisplayRegion {
             x: self_region.x + inherited_offset.0,
             y: self_region.y + inherited_offset.1,
             width: self_region.width,
             height: self_region.height,
-        };
+        });
 
         let tree_node_with_display_region = parse_child_of_node_with_display_region(
             raw_node,
-            &self_region,
+            &Rc::new(self_region),
             &total_display_region,
             occluded_regions,
         );
@@ -92,12 +92,12 @@ pub fn as_ui_tree_node_with_inherited_offset(
 
 pub fn parse_child_of_node_with_display_region(
     ui_tree_node: &Rc<UiTreeNode>,
-    self_display_region: &DisplayRegion,
-    total_display_region: &DisplayRegion,
-    occluded_regions: &mut Vec<DisplayRegion>,
+    self_display_region: &Rc<DisplayRegion>,
+    total_display_region: &Rc<DisplayRegion>,
+    occluded_regions: &mut Vec<Rc<DisplayRegion>>,
 ) -> UITreeNodeWithDisplayRegion {
     let mut mapped_siblings: Vec<Rc<dyn ChildOfNodeWithDisplayRegion>> = Vec::new();
-    let mut occluded_regions_from_siblings: Vec<DisplayRegion> = Vec::new();
+    let mut occluded_regions_from_siblings: Vec<Rc<DisplayRegion>> = Vec::new();
 
     for x in &ui_tree_node.children {
         let child_result = as_ui_tree_node_with_inherited_offset(
@@ -106,14 +106,14 @@ pub fn parse_child_of_node_with_display_region(
             x,
         );
 
-        if let Some(child_with_region) = just_case_with_display_region(&child_result) {
+        if let Some(child_with_region) = just_case_with_display_region(Rc::clone(&child_result)) {
             mapped_siblings.push(child_result);
             let descendants_with_display_region: Vec<Rc<ChildWithRegion>> = list_descendants_with_display_region(&child_with_region.node.children);
             let new_occluded_regions = descendants_with_display_region
                 .iter()
                 .filter(|cwr| node_occludes_following_nodes(&cwr.node))
-                .map(|cwr| cwr.node.total_display_region.clone())
-                .collect::<Vec<DisplayRegion>>();
+                .map(|cwr| Rc::clone(&cwr.node.total_display_region))
+                .collect::<Vec<Rc<DisplayRegion>>>();
 
             occluded_regions_from_siblings.extend(new_occluded_regions);
 
@@ -128,14 +128,14 @@ pub fn parse_child_of_node_with_display_region(
     UITreeNodeWithDisplayRegion {
         ui_node: Rc::clone(ui_tree_node),
         children: mapped_siblings,
-        self_display_region: self_display_region.clone(),
+        self_display_region: Rc::clone(self_display_region),
         total_display_region: total_display_region.clone(),
         total_display_region_visible,
     }
 }
 
 pub fn just_case_with_display_region(
-    child: &Rc<dyn ChildOfNodeWithDisplayRegion>,
+    child: Rc<dyn ChildOfNodeWithDisplayRegion>,
 ) -> Option<Rc<ChildWithRegion>> {
     None
 }
@@ -191,7 +191,7 @@ pub fn list_descendants_with_display_region(
 pub fn list_children_with_display_region(
     children_of_node: &Vec<Rc<dyn ChildOfNodeWithDisplayRegion>>,
 ) -> Vec<Rc<ChildWithRegion>> {
-    children_of_node.iter().filter_map(|child| just_case_with_display_region(child)).collect()
+    children_of_node.iter().filter_map(|child| just_case_with_display_region(Rc::clone(child))).collect()
 }
 
 
@@ -235,51 +235,4 @@ impl NodeOcclusion {
     pub fn node_occludes_following_nodes(node: &UITreeNodeWithDisplayRegion) -> bool {
         PYTHON_OBJECT_TYPES_KNOWN_TO_OCCLUDE.contains(node.ui_node.object_type_name.as_str())
     }
-}
-
-pub struct EvePythonUtils;
-
-impl EvePythonUtils {
-    pub fn is_key_of_interest(key: &str) -> bool {
-        DICT_ENTRIES_OF_INTEREST_KEYS.contains(key)
-    }
-}
-
-
-lazy_static! {
-    static ref DICT_ENTRIES_OF_INTEREST_KEYS: HashSet<&'static str> = {
-        let mut set = HashSet::new();
-        set.insert("_top");
-        set.insert("_left");
-        set.insert("_width");
-        set.insert("_height");
-        set.insert("_displayX");
-        set.insert("_displayY");
-        set.insert("_displayHeight");
-        set.insert("_displayWidth");
-        set.insert("_name");
-        set.insert("_text");
-        set.insert("_setText");
-        set.insert("children");
-        set.insert("texturePath");
-        set.insert("_bgTexturePath");
-        set.insert("_hint");
-        set.insert("_display");
-        set.insert("lastShield");
-        set.insert("lastArmor");
-        set.insert("lastStructure");
-        set.insert("_lastValue");
-        set.insert("ramp_active");
-        set.insert("_rotation");
-        set.insert("_color");
-        set.insert("_sr");
-        set.insert("htmlstr");
-        set.insert("_texturePath");
-        set.insert("_opacity");
-        set.insert("_bgColor");
-        set.insert("isExpanded");
-        set
-    };
-
-
 }

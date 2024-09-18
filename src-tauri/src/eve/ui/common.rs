@@ -76,8 +76,8 @@
     pub struct UITreeNodeWithDisplayRegion {
         pub ui_node: Rc<UiTreeNode>,
         pub children: Vec<Rc<dyn ChildOfNodeWithDisplayRegion>>,
-        pub self_display_region: DisplayRegion,
-        pub total_display_region: DisplayRegion,
+        pub self_display_region: Rc<DisplayRegion>,
+        pub total_display_region: Rc<DisplayRegion>,
         pub total_display_region_visible: DisplayRegion,
     }
 

@@ -32,7 +32,7 @@ impl WindowsMemoryReader {
 
 impl WindowsMemoryReader  {
 
-    pub(crate) fn read_bytes(&self, start_address: u64, length: u64) -> Option<Vec<u8>> {
+    pub(crate) fn read_bytes(&self, start_address: u64, length: u64) -> Result<Vec<u8>, &'static str> {
 
         let mut buffer = vec![0u8; length as usize];
         let mut number_of_bytes_read: usize = 0;
@@ -48,9 +48,9 @@ impl WindowsMemoryReader  {
         };
 
         if success == 0 {
-            None
+            Err("Failed to read memory.")
         } else {
-            Some(buffer)
+            Ok(buffer)
         }
     }
 
