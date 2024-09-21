@@ -252,7 +252,14 @@ impl ExtractPossibleRootAddress {
         windows_memory_reader: &WindowsMemoryReader,
     ) -> Option<Vec<u64>> {
         let byte_array = windows_memory_reader.read_bytes(memory_region.0, memory_region.1);
-        byte_array.map(|bytes| transform_memory_content_as_ulong_memory(&bytes))
+        
+        if byte_array.is_err() {
+            return None;
+        }
+        
+        let result =byte_array.unwrap();
+        
+        Some(transform_memory_content_as_ulong_memory(&result))
     }
 
     fn read_null_terminated_ascii_string_from_address_up_to255(
@@ -260,16 +267,22 @@ impl ExtractPossibleRootAddress {
         address: u64,
         windows_memory_reader: &WindowsMemoryReader,
     ) -> Option<String> {
-        let memory = windows_memory_reader.read_bytes(address, 0x100)?;
+        let memory = windows_memory_reader.read_bytes(address, 0x100);
+        
+        if memory.is_err() {
+            return None;
+        }
 
         let mut length = 0;
-        for (i, &byte) in memory.iter().enumerate() {
+        
+        let memory_result = memory.unwrap();
+        for (i, &byte) in memory_result.iter().enumerate() {
             if byte == 0 {
                 length = i;
                 break;
             }
         }
 
-        Some(String::from_utf8_lossy(&memory[..length]).to_string())
+        Some(String::from_utf8_lossy(&memory_result[..length]).to_string())
     }
 }

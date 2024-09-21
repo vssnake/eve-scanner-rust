@@ -11,6 +11,7 @@ use std::any::Any;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::sync::Arc;
 use crate::process::interop::ui::python_ui_utils::PythonUiUtils;
 
 pub struct UiTreeNodeExtractor {
@@ -63,7 +64,7 @@ impl UiTreeNodeExtractor {
         //let dict_address = u64::from_le_bytes(ui_node_memory[0x10..].try_into().unwrap());
         let dictionary_entries = self.windows_memory_reader_ext.read_active_dictionary_entries_from_dictionary_address(dict_address)?;
 
-        let mut dict_entries_of_interest : HashMap<String,Box<dyn Any>>  = HashMap::new();
+        let mut dict_entries_of_interest : HashMap<String,Arc<Box<dyn Any>>>  = HashMap::new();
         let mut other_dict_entries_keys = Vec::new();
 
         for entry in dictionary_entries.iter() {
@@ -83,16 +84,20 @@ impl UiTreeNodeExtractor {
             }
 
             let dict_entry_value = self.windows_memory_reader_ext
-                .get_dict_entry_value_representation(entry.value, &self.memory_reading_cache)?;
+                .get_dict_entry_value_representation(entry.value, &self.memory_reading_cache);
 
             if (matches!(&dict_entry_value, _DictEntryValueGenericRepresentation)) {
                 continue;
             }
 
+            
+            let generic_value_representation = dict_entry_value.as_ref().downcast_ref::<DictEntryValueGenericRepresentation>();
 
-            if let Some(DictEntryValueGenericRepresentation { python_object_type_name: Some(ref name), .. }) = dict_entry_value.as_ref().downcast_ref() {
-                if **name == "NoneType" {
-                    continue;
+            if let Some(generic_value) = &generic_value_representation {
+                if let Some(object_type_name) = &generic_value.python_object_type_name {
+                    if object_type_name == "NoneType" {
+                        continue;
+                    }
                 }
             }
 
@@ -104,13 +109,13 @@ impl UiTreeNodeExtractor {
                 };
 
                 if result == false {
-                    return None;
+                    return Err("Display is false");
                 }
             }
             dict_entries_of_interest.insert(
                 key_string,
-                Box::new(self.windows_memory_reader_ext
-                    .get_dict_entry_value_representation(entry.value,&self.memory_reading_cache)));
+                self.windows_memory_reader_ext
+                    .get_dict_entry_value_representation(entry.value,&self.memory_reading_cache));
 
         }
 
@@ -153,14 +158,14 @@ impl UiTreeNodeExtractor {
             self.children_with_zones.borrow_mut().entry(zone.clone()).or_insert_with(Vec::new).push(Rc::clone(&node));
         }
 
-        Some(Rc::clone(&node))
+        Ok(Rc::clone(&node))
     }
 
     fn read_childrens(
         &self,
         node_address: u64,
         max_depth: i32,
-        dict_entries_of_interest: &HashMap<String, Box<dyn Any>>,
+        dict_entries_of_interest: &HashMap<String, Arc<Box<dyn Any>>>,
         total_display_region: Rc<DisplayRegion>,
         occluded_regions: &mut Vec<Rc<DisplayRegion>>,
     ) -> Result<(Vec<Rc<UiTreeNode>>, Vec<Rc<dyn ChildOfNodeWithDisplayRegion>>, DisplayRegion), &'static str> {
@@ -197,8 +202,8 @@ impl UiTreeNodeExtractor {
                 );
 
                 mapped_siblings.insert(0, Rc::clone(&child_result)); // Insert at the start to build the list in reverse order
-
-                occluded_regions.extend(occluded_regions_from_siblings.iter());
+                
+                occluded_regions.extend(occluded_regions_from_siblings.iter().cloned());
             }
             
             children_tree_nodes.push(Rc::clone(&child.ui_node));
@@ -214,7 +219,7 @@ impl UiTreeNodeExtractor {
     fn get_children_addresses(
         &self,
         node_address: u64,
-        dict_entries_of_interest: &HashMap<String, Box<dyn Any>>,
+        dict_entries_of_interest: &HashMap<String, Arc<Box<dyn Any>>>,
     ) -> Result<Vec<u64>, &'static str> {
         let children_dict_entry = dict_entries_of_interest.get("children");
         
@@ -222,13 +227,13 @@ impl UiTreeNodeExtractor {
             return Err("Not found children key in dict entries of interest");
         }
 
-        let children_entry_object_address = children_dict_entry.downcast_ref::<DictEntryValueGenericRepresentation>()?.address;
-
-
+        
+        let children_entry_object_address = children_dict_entry.unwrap().downcast_ref::<DictEntryValueGenericRepresentation>().unwrap().address;
+        
         let py_children_list_memory = self.memory_reader.read_bytes(children_entry_object_address, 0x18)?;
 
         if py_children_list_memory.len() != 0x18 {
-            return None;
+            return Err("Children list memory is not 0x18 bytes long");
         }
 
         let py_children_dict_address = u64::from_le_bytes(py_children_list_memory[0x10..].try_into().unwrap());
@@ -244,19 +249,19 @@ impl UiTreeNodeExtractor {
         });
         
         if children_entry.is_none() {
-            return None;
+            return Err("Not found _childrenObjects key in children dict entries");
         }
 
         let python_list_object_memory = self.memory_reader.read_bytes(children_entry.unwrap().value, 0x20)?;
 
         if python_list_object_memory.len() != 0x20 {
-            return None;
+            return Err("Python list object memory is not 0x20 bytes long");
         }
 
         let list_ob_size = u64::from_le_bytes(python_list_object_memory[0x10..].try_into().unwrap());
 
         if list_ob_size > 4000 {
-            return None;
+            return Err("List ob size is greater than 4000");
         }
 
         let list_entries_size = (list_ob_size * 8) as usize;
@@ -264,7 +269,7 @@ impl UiTreeNodeExtractor {
 
         let list_entries_memory = self.memory_reader.read_bytes(list_ob_item, list_entries_size as u64)?;
 
-        Some(
+        Ok(
             transform_memory_content_as_ulong_memory(&list_entries_memory)
                 .into_iter()
                 .collect(),

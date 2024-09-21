@@ -13,14 +13,14 @@ pub struct PyDictEntry {
 #[derive(Debug)]
 pub struct DictEntryValueGenericRepresentation {
     pub address: u64,
-    pub python_object_type_name: String,
+    pub python_object_type_name: Option<String>,
 }
 
 // Define a struct similar to DictEntry
 #[derive(Debug)]
 pub struct DictEntry {
     pub key: String,
-    pub value: Box<dyn std::any::Any>, // Rust doesn't have a direct equivalent to C#'s `object`, so we use a trait object
+    pub value: Arc<Box<dyn std::any::Any>>, // Rust doesn't have a direct equivalent to C#'s `object`, so we use a trait object
 }
 
 // Define a struct similar to LongInt

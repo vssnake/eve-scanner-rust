@@ -4,10 +4,11 @@ use crate::process::interop::ui::ui_tree_node::UiTreeNode;
 use lazy_static::lazy_static;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
+use std::sync::Arc;
 use crate::process::interop::memory::python_models::LongInt;
 
 pub fn get_display_region_from_dict_entries(
-    entries_of_interest: &HashMap<String, Box<dyn Any>>,
+    entries_of_interest: &HashMap<String, Arc<Box<dyn Any>>>,
 ) -> Option<DisplayRegion> {
     let display_x = fixed_number_from_property_name("_displayX", entries_of_interest);
     let display_y = fixed_number_from_property_name("_displayY", entries_of_interest);
@@ -162,7 +163,7 @@ pub fn list_descendants_in_ui_tree_node(children:Vec<Rc<UiTreeNode>>) -> Vec<Rc<
 
 fn fixed_number_from_property_name(
     property_name: &str,
-    entries_of_interest: &HashMap<String, Box<dyn Any>>,
+    entries_of_interest: &HashMap<String, Arc<Box<dyn Any>>>,
 ) -> Option<i32> {
     entries_of_interest
         .get(property_name)

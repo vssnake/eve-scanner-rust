@@ -76,13 +76,16 @@ impl PythonMemoryReader {
         let tp_name_address = u64::from_le_bytes(type_object_memory[type_object_name_offset..type_object_name_offset + 8].try_into().unwrap());
         let name_bytes = self.memory_reader.read_bytes(tp_name_address, name_max_length)?;
 
-        let null_terminator_index = name_bytes.iter().position(|&byte| byte == 0)
-            .map_err(|_| "Failed to find null terminator")?;
+        let null_terminator_index = name_bytes.iter().position(|&byte| byte == 0);
+        
+        if null_terminator_index.is_none() {
+            return Err("Failed to find null terminator");
+        }
 
-        let result = std::str::from_utf8(&name_bytes[..null_terminator_index])
+        let result = std::str::from_utf8(&name_bytes[..null_terminator_index.unwrap()])
             .map_err(|_| "Failed to parse utf8")?;
 
-        result.to_string()
+        Ok(result.to_string())
     }
 
     pub fn read_python_string_value(
@@ -147,10 +150,10 @@ impl PythonMemoryReader {
         if python_object_memory.len() != python_object_memory_size {
             return Err("Failed to read python object memory"); // Failed to read python object memory
         }
-
+        
         let unicode_string_length = u64::from_ne_bytes(
             python_object_memory[unicode_string_length_offset..unicode_string_length_offset + 8]
-                .try_into()?,
+                .try_into().map_err(|_| "Failed to slide")?,
         );
 
         if unicode_string_length > unicode_string_max_length {
@@ -162,7 +165,7 @@ impl PythonMemoryReader {
    
         let string_start_address = u64::from_ne_bytes(
             python_object_memory[string_bytes_offset..string_bytes_offset + 8]
-                .try_into()?,
+                .try_into().map_err(|_| "Failed to slide")?,
         );
 
         let string_bytes = self
@@ -190,7 +193,7 @@ impl PythonMemoryReader {
 
         let boolean_value = i64::from_ne_bytes(
             python_object_memory[boolean_value_offset..boolean_value_offset + 8]
-                .try_into()?,
+                .try_into().map_err(|_| "Failed to slide")?,
         );
 
         Ok(boolean_value != 0)
@@ -216,7 +219,7 @@ impl PythonMemoryReader {
         // Extract the 64-bit integer value from the memory
         let int_value = i64::from_ne_bytes(
             python_object_memory[int_value_offset..int_value_offset + 8]
-                .try_into()?,
+                .try_into().map_err(|_| "Failed to slide")?,
         );
 
         // Check if the value can be represented as an i32
@@ -247,7 +250,7 @@ impl PythonMemoryReader {
 
         let float_value = f64::from_ne_bytes(
             python_object_memory[float_value_offset..float_value_offset + 8]
-                .try_into()?,
+                .try_into().map_err(|_| "Failed to slide")?,
         );
 
         Ok(float_value)
@@ -272,15 +275,18 @@ impl PythonMemoryReader {
         let dictionary_entries =
             self.read_active_dictionary_entries_from_dictionary_address(dictionary_object_address);
 
-        if dictionary_entries.is_none() {
+        if dictionary_entries.is_err() {
             return HashMap::new(); // Return an empty HashMap instead of ImmutableDictionary.Empty
         }
 
         let mut result = HashMap::new();
 
         for entry in dictionary_entries.unwrap().iter() {
-            if let Some(key) = self.read_python_string_value_max_length_4000(entry.key, cache) {
-                result.insert(key, entry.value);
+            
+            let key = self.read_python_string_value_max_length_4000(entry.key, cache);
+            
+            if key.is_ok() {
+                result.insert(key.unwrap(), entry.value);
             }
         }
 
@@ -357,39 +363,42 @@ impl PythonMemoryReader {
         &self,
         value_object_address: u64,
         memory_reading_cache: &MemoryReadingCache
-    ) -> Box<dyn std::any::Any> {
+    ) -> Arc<Box<dyn std::any::Any>> {
         let result_cache = memory_reading_cache
             .get_dict_entry_value_representation(value_object_address, || {
                 let value_python_type_name =
                     self.get_python_type_name_from_python_object_address(value_object_address,memory_reading_cache);
                 
-                let value_python_type_name = value_python_type_name
-                    .unwrap_or_else(|error| error.to_string());
+                
+                let value_python_type_name_option = value_python_type_name.as_ref().ok();
 
                 
-                let generic_representation = Box::new(DictEntryValueGenericRepresentation {
+                let generic_representation = Arc::new(Box::new(DictEntryValueGenericRepresentation {
                     address: value_object_address,
-                    python_object_type_name: value_python_type_name,
-                }) as Box<dyn std::any::Any>;
+                    python_object_type_name: value_python_type_name_option.cloned(),
+                }) as Box<dyn std::any::Any>);
                 
                 
-                if (value_python_type_name == None) {
+                if (value_python_type_name_option.is_none()) {
                     return Ok(generic_representation);
                 }
                 
                 let specialized_representation = 
-                    PythonUiUtils::specialized_reading_from_python_type(self.memory_reader.borrow(),
+                    PythonUiUtils::specialized_reading_from_python_type(&self,
                                                                         value_object_address,
-                                                                        &value_python_type_name,
+                                                                        &value_python_type_name_option.unwrap(),
                                                                         memory_reading_cache);
                 
                 if  specialized_representation.is_err() {
                     return Ok(generic_representation);
                 }
 
-                specialized_representation.unwrap()
+                specialized_representation.map(|value| {
+                    Arc::new(value) 
+                })
             });
         
+  
         result_cache.unwrap()
     }
 

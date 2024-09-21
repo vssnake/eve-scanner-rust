@@ -31,9 +31,9 @@ impl MemoryReadingCache {
         self.get_from_cache_or_update(&self.python_string_value_max_length_4000, address, get_fresh)
     }
 
-    pub fn get_dict_entry_value_representation<F>(&self, address: u64, get_fresh: F) -> Result<Box<dyn std::any::Any>, &'static str>
+    pub fn get_dict_entry_value_representation<F>(&self, address: u64, get_fresh: F) -> Result<Arc<Box<dyn std::any::Any>>, &'static str>
     where
-        F: FnOnce() -> Result<Box<dyn std::any::Any>, &'static str>,
+        F: FnOnce() -> Result<Arc<Box<dyn std::any::Any>>, &'static str>,
     {
         self.get_from_cache_or_update(&self.dict_entry_value_representation, address, get_fresh)
     }
@@ -56,10 +56,12 @@ impl MemoryReadingCache {
         }
 
         let fresh = get_fresh();
+        
+        let return_fresh = fresh.clone();
         if fresh.is_ok() {
             cache_lock.insert(key, fresh?.clone());
         }
 
-        fresh
+        return_fresh
     }
 }

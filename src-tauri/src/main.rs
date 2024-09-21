@@ -32,7 +32,7 @@ fn main() {
     for address in possible_root_address {
         info!("Possible root address: {:#X}", address);
         let ui_tree = uiExtractor.extract_ui_tree_from_address(address, 99);
-        if ui_tree.is_none() {
+        if ui_tree.is_err() {
             continue;
         }
         ui_tree_nodes.push(ui_tree.unwrap());
