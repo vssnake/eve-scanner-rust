@@ -4,14 +4,16 @@
 /*fn main() {
     tauri_app_lib::run()
 }*/
+extern crate core;
+
 use std::rc::Rc;
 use log::info;
-use crate::eve::ui::common::common::UITreeNodeWithDisplayRegion;
+use crate::eve::ui::common::common::{ChildWithRegion, ChildWithoutRegion};
 use crate::operations::extract_possible_root_address::ExtractPossibleRootAddress;
 use crate::operations::obtain_pid_process::ObtainPidProcess;
 use crate::operations::ui_tree_node_extractor::UiTreeNodeExtractor;
 use crate::process::interop::memory::windows_memory_reader::WindowsMemoryReader;
-use crate::process::interop::ui::ui_tree_node::UiTreeNode;
+use crate::process::interop::ui::ui_tree_node::{UITreeNodeWithDisplayRegion, UiTreeNode};
 
 mod process;
 mod operations;
@@ -36,6 +38,30 @@ fn main() {
             continue;
         }
         ui_tree_nodes.push(ui_tree.unwrap());
+    }
+
+    for ui_tree_node in ui_tree_nodes {
+        /*for children in ui_tree_node.children.iter() {
+            match children.as_any() {
+                any if any.is::<ChildWithRegion>() => {
+                    let child_with_region = any.downcast_ref::<ChildWithRegion>().unwrap();
+                    let node = &child_with_region.node;
+                    println!(
+                        "Es un ChildWithRegion con región. Datos: con X: {}",
+                        child_with_region.node.self_display_region.x
+                    );
+                }
+                any if any.is::<ChildWithoutRegion>() => {
+                    let child_without_region = any.downcast_ref::<ChildWithoutRegion>().unwrap();
+                    let node = &child_without_region.node;
+                    println!("Es un ChildWithoutRegion sin región.");
+                }
+                _ => {
+                    println!("Tipo desconocido.");
+                }
+            }
+           
+        } */
     }
 
 

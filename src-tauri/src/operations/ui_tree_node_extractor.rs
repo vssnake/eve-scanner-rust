@@ -1,4 +1,4 @@
-﻿use crate::eve::ui::common::common::{ChildOfNodeWithDisplayRegion, DisplayRegion, UITreeNodeWithDisplayRegion};
+﻿use crate::eve::ui::common::common::{ChildOfNodeWithDisplayRegion, ChildWithRegion, ChildWithoutRegion, DisplayRegion};
 use crate::eve::ui::ui_constants::{UiConstants, UiZonesEnum, UI_ZONES};
 use crate::process::interop::ui::eve_python_utils::{as_ui_tree_node_with_inherited_offset, get_display_region_from_dict_entries, just_case_with_display_region, list_descendants_with_display_region, NodeOcclusion};
 use crate::process::interop::memory::memory_reading_cache::MemoryReadingCache;
@@ -6,7 +6,7 @@ use crate::process::interop::memory::memory_utils::transform_memory_content_as_u
 use crate::process::interop::memory::python_memory_reader::PythonMemoryReader;
 use crate::process::interop::memory::python_models::DictEntryValueGenericRepresentation;
 use crate::process::interop::memory::windows_memory_reader::WindowsMemoryReader;
-use crate::process::interop::ui::ui_tree_node::UiTreeNode;
+use crate::process::interop::ui::ui_tree_node::{UITreeNodeWithDisplayRegion, UiTreeNode};
 use std::any::Any;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -86,15 +86,15 @@ impl UiTreeNodeExtractor {
             let dict_entry_value = self.windows_memory_reader_ext
                 .get_dict_entry_value_representation(entry.value, &self.memory_reading_cache);
 
-            if (matches!(&dict_entry_value, _DictEntryValueGenericRepresentation)) {
+            /*if (matches!(&dict_entry_value, _DictEntryValueGenericRepresentation)) {
                 continue;
-            }
+            }*/
 
             
             let generic_value_representation = dict_entry_value.as_ref().downcast_ref::<DictEntryValueGenericRepresentation>();
 
-            if let Some(generic_value) = &generic_value_representation {
-                if let Some(object_type_name) = &generic_value.python_object_type_name {
+            if generic_value_representation.is_some() {
+                if let Some(object_type_name) = &generic_value_representation.unwrap().python_object_type_name {
                     if object_type_name == "NoneType" {
                         continue;
                     }
@@ -112,10 +112,12 @@ impl UiTreeNodeExtractor {
                     return Err("Display is false");
                 }
             }
+            
+            /*let dict_entry_representation =  self.windows_memory_reader_ext
+                .get_dict_entry_value_representation(entry.value,&self.memory_reading_cache);*/
+            
             dict_entries_of_interest.insert(
-                key_string,
-                self.windows_memory_reader_ext
-                    .get_dict_entry_value_representation(entry.value,&self.memory_reading_cache));
+                key_string,dict_entry_value);
 
         }
 
@@ -126,14 +128,17 @@ impl UiTreeNodeExtractor {
 
         let total_display_region = total_display_region.unwrap_or(Rc::clone(&cloned_self_display_region));
         let mut occluded_regions = occluded_regions.unwrap_or_else(Vec::new);
-
-        let (children, mapped_siblings, total_display_region_visible) = self.read_childrens(
+        
+       
+        let (children, childs_with_region, 
+            childs_without_region,
+            total_display_region_visible) = self.read_childrens(
             node_address,
             max_depth,
             &dict_entries_of_interest,
             Rc::clone(&total_display_region),
             &mut occluded_regions,
-        )?;
+        ).unwrap_or_else(|_| (Vec::new(), Vec::new(), DisplayRegion::new(0, 0, 0, 0)));
 
         let ui_tree_node = UiTreeNode::new(
             node_address,
@@ -146,7 +151,8 @@ impl UiTreeNodeExtractor {
 
         let node_with_display_region = UITreeNodeWithDisplayRegion {
             ui_node: Rc::new(ui_tree_node),
-            children: mapped_siblings,
+            child_with_region: childs_with_region,
+            child_without_region: childs_without_region,
             self_display_region: Rc::clone(&cloned_self_display_region),
             total_display_region: Rc::clone(&total_display_region),
             total_display_region_visible,
@@ -168,7 +174,7 @@ impl UiTreeNodeExtractor {
         dict_entries_of_interest: &HashMap<String, Arc<Box<dyn Any>>>,
         total_display_region: Rc<DisplayRegion>,
         occluded_regions: &mut Vec<Rc<DisplayRegion>>,
-    ) -> Result<(Vec<Rc<UiTreeNode>>, Vec<Rc<dyn ChildOfNodeWithDisplayRegion>>, DisplayRegion), &'static str> {
+    ) -> Result<(Vec<Rc<UiTreeNode>>, Vec<Rc<ChildWithRegion>>, Vec<Rc<ChildWithoutRegion>>, DisplayRegion), &'static str> {
 
         //  https://github.com/Arcitectus/Sanderling/blob/b07769fb4283e401836d050870121780f5f37910/guide/image/2015-01.eve-online-python-ui-tree-structure.png
 
@@ -176,7 +182,8 @@ impl UiTreeNodeExtractor {
         let child_addresses = self.get_children_addresses(node_address, dict_entries_of_interest)?;
 
         let mut children_tree_nodes: Vec<Rc<UiTreeNode>> = Vec::new();
-        let mut mapped_siblings = Vec::new();
+        let mut childs_with_region: Vec<Rc<ChildWithRegion>> = Vec::new();
+        let mut childs_without_region: Vec<Rc<ChildWithoutRegion>> = Vec::new();
         let mut occluded_regions_from_siblings = Vec::new();
 
         for child_address in child_addresses {
@@ -192,7 +199,7 @@ impl UiTreeNodeExtractor {
             let child_with_region = just_case_with_display_region(Rc::clone(&child_result));
             
             if (child_with_region.is_some()) {
-                let descendants_with_display_region = list_descendants_with_display_region(child_with_region.unwrap().node.children.as_ref());
+                let descendants_with_display_region = list_descendants_with_display_region(child_with_region.unwrap().node.ui_node.children.as_ref());
 
                 occluded_regions_from_siblings.extend(
                     descendants_with_display_region
@@ -201,19 +208,22 @@ impl UiTreeNodeExtractor {
                         .map(|child_w_region| Rc::clone(&child_w_region.node.total_display_region)),
                 );
 
-                mapped_siblings.insert(0, Rc::clone(&child_result)); // Insert at the start to build the list in reverse order
+                childs_with_region.insert(0,child_result); // Insert at the start to build the list in reverse order
                 
                 occluded_regions.extend(occluded_regions_from_siblings.iter().cloned());
+            }else{
+                childs_without_region.insert(0,child_result); // Insert at the start to build the list in reverse order
             }
             
             children_tree_nodes.push(Rc::clone(&child.ui_node));
         }
 
-        mapped_siblings.reverse(); // Reverse to correct the order after processing
+        childs_with_region.reverse(); // Reverse to correct the order after processing
+        childs_without_region.reverse();
 
         let total_display_region_visible = DisplayRegion::new(-1, -1, 0, 0);
 
-        Ok((children_tree_nodes, mapped_siblings, total_display_region_visible))
+        Ok((children_tree_nodes, childs_with_region,childs_without_region, total_display_region_visible))
     }
 
     fn get_children_addresses(
@@ -241,11 +251,17 @@ impl UiTreeNodeExtractor {
 
         let children_entry = py_children_dict_entries.into_iter().find(|entry| {
             let key_type_name = self.windows_memory_reader_ext.get_python_type_name_from_object_address(entry.key, &self.memory_reading_cache);
-            if key_type_name.map_or(false, |name| name == "str") {
+            if key_type_name.map_or(false, |name| name != "str") {
                 return false;
             }
-            let key_string = self.windows_memory_reader_ext.read_python_string_value_max_length_4000(entry.key, &self.memory_reading_cache);
-            key_string.map_or(false, |s| s == "_childrenObjects")
+            let key_string_result = self.windows_memory_reader_ext.read_python_string_value_max_length_4000(entry.key, &self.memory_reading_cache);
+            if  key_string_result.is_err() {
+                return false;
+            }
+            let key_string = key_string_result.unwrap();
+            
+            return key_string == "_childrenObjects";
+            //key_string.map_or(false, |s| s == "_childrenObjects")
         });
         
         if children_entry.is_none() {
@@ -258,7 +274,9 @@ impl UiTreeNodeExtractor {
             return Err("Python list object memory is not 0x20 bytes long");
         }
 
-        let list_ob_size = u64::from_le_bytes(python_list_object_memory[0x10..].try_into().unwrap());
+        let bytes_slice = &python_list_object_memory[0x10..0x18];
+        
+        let list_ob_size = u64::from_le_bytes(bytes_slice.try_into().unwrap());
 
         if list_ob_size > 4000 {
             return Err("List ob size is greater than 4000");

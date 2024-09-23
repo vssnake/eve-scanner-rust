@@ -1,8 +1,7 @@
 ﻿use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use lazy_static::lazy_static;
-use crate::eve::ui::common::common;
-use crate::eve::ui::common::common::UITreeNodeWithDisplayRegion;
+use crate::process::interop::ui::ui_tree_node::UITreeNodeWithDisplayRegion;
 
 pub struct UiConstants;
 

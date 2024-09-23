@@ -27,11 +27,7 @@ impl IntWrapper {
         match *self {
             IntWrapper::Int32(value) => Some(value),
             IntWrapper::Int64(value) => {
-                if value as i32 as i64 == value {
-                    Some(value as i32)
-                } else {
-                    None
-                }
+                Some(value as i32)
             }
         }
     }

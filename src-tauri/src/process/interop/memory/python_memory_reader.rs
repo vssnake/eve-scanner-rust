@@ -56,7 +56,7 @@ impl PythonMemoryReader {
             self.get_python_type_name_from_type_object_address(type_object_address)
         });
         
-        result
+        result.ok_or_else(|| "Failed to get python type name from object address")
     }
 
     pub fn get_python_type_name_from_type_object_address(
@@ -261,10 +261,12 @@ impl PythonMemoryReader {
         str_object_address: u64,
         cache: &MemoryReadingCache,
     ) -> Result<String, &'static str> {
-        cache
+        let cache_result = cache
             .get_python_string_value_max_length_4000(str_object_address, || {
                 return self.read_python_string_value(str_object_address, 4000);
-            })
+            });
+        
+        cache_result.ok_or_else(|| "Failed to read python string value")
     }
 
     pub fn get_dictionary_entries_with_string_keys(
@@ -272,16 +274,19 @@ impl PythonMemoryReader {
         dictionary_object_address: u64,
         cache: &MemoryReadingCache,
     ) -> HashMap<String, u64> {
-        let dictionary_entries =
+        let dictionary_entries_result =
             self.read_active_dictionary_entries_from_dictionary_address(dictionary_object_address);
 
-        if dictionary_entries.is_err() {
+        if dictionary_entries_result.is_err() {
             return HashMap::new(); // Return an empty HashMap instead of ImmutableDictionary.Empty
         }
+        
+        let dictionary_entries = dictionary_entries_result.unwrap();
+        
 
         let mut result = HashMap::new();
 
-        for entry in dictionary_entries.unwrap().iter() {
+        for entry in dictionary_entries.iter() {
             
             let key = self.read_python_string_value_max_length_4000(entry.key, cache);
             
@@ -397,8 +402,10 @@ impl PythonMemoryReader {
                     Arc::new(value) 
                 })
             });
-        
-  
+
+        if (result_cache.is_none()){
+            println!("Result cache is none");
+        }
         result_cache.unwrap()
     }
 
@@ -407,7 +414,7 @@ impl PythonMemoryReader {
         object_address: u64,
         memory_reading_cache: &MemoryReadingCache) -> Result<String, &'static str> {
         
-        memory_reading_cache
+        let cache_result = memory_reading_cache
             .get_python_type_name_from_python_object_address(object_address, || {
                 let object_memory = self.memory_reader.read_bytes(object_address, 0x10)?;
 
@@ -418,6 +425,8 @@ impl PythonMemoryReader {
                 return self.get_python_type_name_from_type_object_address(
                     u64::from_le_bytes(object_memory[8..].try_into().unwrap())
                 );
-            })
+            });
+        
+        cache_result.ok_or_else(|| "Failed to get python type name from object address")
     }
 }

@@ -1,10 +1,7 @@
 ﻿pub mod common {
+    use crate::process::interop::ui::ui_tree_node::{UITreeNodeWithDisplayRegion, UiTreeNode};
     use std::any::Any;
-    use std::cell::RefCell;
-    use std::collections::HashMap;
     use std::rc::Rc;
-    use crate::eve::ui::ui_constants::{UiConstants, UiZonesEnum, UI_ZONES};
-    use crate::process::interop::ui::ui_tree_node::UiTreeNode;
 
     #[derive(Debug, Clone)]
     pub struct ColorComponents {
@@ -45,10 +42,15 @@
     pub trait ChildOfNodeWithDisplayRegion {
         fn has_region(&self) -> bool;
         fn as_any(& self) -> &dyn Any;
+        fn as_any_rc(self: Rc<Self>) -> Rc<dyn Any>;
     }
 
     pub struct ChildWithRegion {
         pub node: UITreeNodeWithDisplayRegion,
+    }
+
+    pub struct ChildWithoutRegion {
+        pub node: Rc<UiTreeNode>,
     }
 
     impl ChildOfNodeWithDisplayRegion for ChildWithRegion {
@@ -56,6 +58,10 @@
             true
         }
         fn as_any(&self) -> &dyn Any {
+            self
+        }
+
+        fn as_any_rc(self: Rc<Self>) -> Rc<dyn Any> {
             self
         }
     }
@@ -67,25 +73,10 @@
         fn as_any(&self) -> &dyn Any {
             self
         }
-    }
 
-    pub struct ChildWithoutRegion {
-        pub node: Rc<UiTreeNode>,
+        fn as_any_rc(self: Rc<Self>) -> Rc<dyn Any> {
+            self
+        }
     }
-
-    pub struct UITreeNodeWithDisplayRegion {
-        pub ui_node: Rc<UiTreeNode>,
-        pub children: Vec<Rc<dyn ChildOfNodeWithDisplayRegion>>,
-        pub self_display_region: Rc<DisplayRegion>,
-        pub total_display_region: Rc<DisplayRegion>,
-        pub total_display_region_visible: DisplayRegion,
-    }
-
-    impl UITreeNodeWithDisplayRegion {
-    }
-
-    pub struct ScrollControls {
-        pub ui_node:  Rc<UITreeNodeWithDisplayRegion>,
-        pub scroll_handle: Option<Rc<UITreeNodeWithDisplayRegion>>
-    }
+    
 }

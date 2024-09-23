@@ -1,6 +1,7 @@
 ﻿use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::hash::Hash;
+use winapi::um::winnt::FirmwareTypeUnknown;
 
 pub struct MemoryReadingCache {
     python_type_name_from_python_object_address: Arc<Mutex<HashMap<u64, String>>>,
@@ -17,21 +18,21 @@ impl MemoryReadingCache {
         }
     }
 
-    pub fn get_python_type_name_from_python_object_address<F>(&self, address: u64, get_fresh: F) -> Result<String, &'static str>
+    pub fn get_python_type_name_from_python_object_address<F>(&self, address: u64, get_fresh: F) -> Option<String>
     where
         F: FnOnce() -> Result<String, &'static str>,
     {
         self.get_from_cache_or_update(&self.python_type_name_from_python_object_address, address, get_fresh)
     }
 
-    pub fn get_python_string_value_max_length_4000<F>(&self, address: u64, get_fresh: F) -> Result<String, &'static str>
+    pub fn get_python_string_value_max_length_4000<F>(&self, address: u64, get_fresh: F) -> Option<String>
     where
         F: FnOnce() -> Result<String, &'static str>,
     {
         self.get_from_cache_or_update(&self.python_string_value_max_length_4000, address, get_fresh)
     }
 
-    pub fn get_dict_entry_value_representation<F>(&self, address: u64, get_fresh: F) -> Result<Arc<Box<dyn std::any::Any>>, &'static str>
+    pub fn get_dict_entry_value_representation<F>(&self, address: u64, get_fresh: F) -> Option<Arc<Box<dyn std::any::Any>>>
     where
         F: FnOnce() -> Result<Arc<Box<dyn std::any::Any>>, &'static str>,
     {
@@ -43,7 +44,7 @@ impl MemoryReadingCache {
         cache: &Arc<Mutex<HashMap<K, V>>>,
         key: K,
         get_fresh: F,
-    ) -> Result<V, &'static str>
+    ) -> Option<V>
     where
         K: Eq + Hash + Copy,
         V: Clone,
@@ -52,16 +53,17 @@ impl MemoryReadingCache {
         let mut cache_lock = cache.lock().unwrap();
 
         if let Some(from_cache) = cache_lock.get(&key) {
-            return Ok(from_cache.clone());
+            return Some(from_cache.clone());
         }
 
         let fresh = get_fresh();
         
-        let return_fresh = fresh.clone();
         if fresh.is_ok() {
-            cache_lock.insert(key, fresh?.clone());
+            let result = fresh.unwrap();
+            cache_lock.insert(key, result.clone());
+            return Some(result);
         }
 
-        return_fresh
+        None
     }
 }

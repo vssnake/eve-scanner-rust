@@ -2,6 +2,7 @@
 use std::rc::Rc;
 use std::sync::Arc;
 use serde::{Serialize, Deserialize};
+use crate::eve::ui::common::common::{ChildOfNodeWithDisplayRegion, ChildWithRegion, ChildWithoutRegion, DisplayRegion};
 
 #[derive(Debug)]
 pub struct UiTreeNode {
@@ -42,4 +43,21 @@ impl UiTreeNode {
             children,
         }
     }
+}
+
+pub struct UITreeNodeWithDisplayRegion {
+    pub ui_node: Rc<UiTreeNode>,
+    pub child_with_region: Vec<Rc<ChildWithRegion>>,
+    pub child_without_region: Vec<Rc<ChildWithoutRegion>>,
+    pub self_display_region: Rc<DisplayRegion>,
+    pub total_display_region: Rc<DisplayRegion>,
+    pub total_display_region_visible: DisplayRegion,
+}
+
+impl UITreeNodeWithDisplayRegion {
+}
+
+pub struct ScrollControls {
+    pub ui_node: Rc<UITreeNodeWithDisplayRegion>,
+    pub scroll_handle: Option<Rc<UITreeNodeWithDisplayRegion>>
 }
