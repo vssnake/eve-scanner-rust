@@ -129,8 +129,8 @@ pub fn parse_child_of_node_with_display_region(
             occluded_regions_from_siblings.extend(new_occluded_regions);
 
             occluded_regions.extend(occluded_regions_from_siblings.iter().cloned());
-        }else { 
-            childs_without_region.push(child_result);
+        }else {
+            childs_without_region.push(child_result.as_any_rc().downcast::<ChildWithoutRegion>().unwrap());
         }
     }
 
@@ -154,30 +154,14 @@ pub fn just_case_with_display_region(
 ) -> Option<Rc<ChildWithRegion>> {
     
     if child.has_region() {
-        // Hacemos downcast a &ChildWithRegion
-    
-        let test = child.as_any_rc();
-        let downcasted=  test.downcast::<ChildWithRegion>();
-        //let downcasted  = test.downcast_ref::<Rc<ChildWithRegion>>();
+       
+        let child_as_any_rc = child.as_any_rc();
+        let child_with_region=  child_as_any_rc.downcast::<ChildWithRegion>();
         
-        if (downcasted.is_err()) {
+        if (child_with_region.is_err()) {
             return None;
         }
-        /*let rc_child = Rc::new(ChildWithRegion {
-            node: downcasted.node
-        });*/
-        // Clonamos la referencia Rc envolviendo la referencia tipo ChildWithRegion
-        
-        /*let child_unsafe = unsafe {
-            let test = Rc::into_raw(downcasted.into());
-            let rc_child = Rc::from_raw(test);
-
-            Some(rc_child)
-        };*/
-       
-        // Devolvemos el nuevo Rc clonando nuevamente
-        //(rc_child)
-        Some(downcasted.unwrap())
+        Some(child_with_region.unwrap())
     } else {
         None
     }
@@ -214,13 +198,11 @@ fn fixed_number_from_property_name(
 }
 
 pub fn list_descendants_with_display_region(
-    children: &Vec<Rc<dyn ChildOfNodeWithDisplayRegion>>,
+    children: &Vec<Rc<ChildWithRegion>>,
 ) -> Vec<Rc<ChildWithRegion>> {
     let mut all_descendants: Vec<Rc<ChildWithRegion>> = Vec::new();
 
-    let children_with_regions: Vec<Rc<ChildWithRegion>> = list_children_with_display_region(children);
-
-    for child_with_region in children_with_regions.iter() {
+    for child_with_region in children.iter() {
 
         all_descendants.push(Rc::clone(child_with_region));
 

@@ -138,7 +138,7 @@ impl UiTreeNodeExtractor {
             &dict_entries_of_interest,
             Rc::clone(&total_display_region),
             &mut occluded_regions,
-        ).unwrap_or_else(|_| (Vec::new(), Vec::new(), DisplayRegion::new(0, 0, 0, 0)));
+        ).unwrap_or_else(|_| (Vec::new(), Vec::new(),Vec::new(), DisplayRegion::new(0, 0, 0, 0)));
 
         let ui_tree_node = UiTreeNode::new(
             node_address,
@@ -196,10 +196,11 @@ impl UiTreeNodeExtractor {
                 &child.ui_node,
             );
 
-            let child_with_region = just_case_with_display_region(Rc::clone(&child_result));
+            let child_with_region_option = just_case_with_display_region(Rc::clone(&child_result));
             
-            if (child_with_region.is_some()) {
-                let descendants_with_display_region = list_descendants_with_display_region(child_with_region.unwrap().node.ui_node.children.as_ref());
+            if (child_with_region_option.is_some()) {
+                let child_with_region = Rc::clone(&child_with_region_option.unwrap());
+                let descendants_with_display_region = list_descendants_with_display_region(&child_with_region.node.child_with_region);
 
                 occluded_regions_from_siblings.extend(
                     descendants_with_display_region
@@ -208,11 +209,11 @@ impl UiTreeNodeExtractor {
                         .map(|child_w_region| Rc::clone(&child_w_region.node.total_display_region)),
                 );
 
-                childs_with_region.insert(0,child_result); // Insert at the start to build the list in reverse order
+                childs_with_region.insert(0,child_with_region); // Insert at the start to build the list in reverse order
                 
                 occluded_regions.extend(occluded_regions_from_siblings.iter().cloned());
             }else{
-                childs_without_region.insert(0,child_result); // Insert at the start to build the list in reverse order
+                childs_without_region.insert(0,child_result.as_any_rc().downcast::<ChildWithoutRegion>().unwrap()); // Insert at the start to build the list in reverse order
             }
             
             children_tree_nodes.push(Rc::clone(&child.ui_node));
