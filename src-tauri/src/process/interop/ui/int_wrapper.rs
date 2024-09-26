@@ -1,7 +1,9 @@
-﻿pub  enum IntWrapper {
+﻿#[derive(Debug)]
+pub  enum IntWrapper {
     Int32(i32),
     Int64(i64),
 }
+
 
 impl IntWrapper {
 

@@ -11,7 +11,6 @@ use std::any::Any;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::sync::Arc;
 use crate::process::interop::ui::python_ui_utils::PythonUiUtils;
 
 pub struct UiTreeNodeExtractor {
@@ -64,7 +63,7 @@ impl UiTreeNodeExtractor {
         //let dict_address = u64::from_le_bytes(ui_node_memory[0x10..].try_into().unwrap());
         let dictionary_entries = self.windows_memory_reader_ext.read_active_dictionary_entries_from_dictionary_address(dict_address)?;
 
-        let mut dict_entries_of_interest : HashMap<String,Arc<Box<dyn Any>>>  = HashMap::new();
+        let mut dict_entries_of_interest : HashMap<String,Rc<Box<dyn Any>>>  = HashMap::new();
         let mut other_dict_entries_keys = Vec::new();
 
         for entry in dictionary_entries.iter() {
@@ -171,7 +170,7 @@ impl UiTreeNodeExtractor {
         &self,
         node_address: u64,
         max_depth: i32,
-        dict_entries_of_interest: &HashMap<String, Arc<Box<dyn Any>>>,
+        dict_entries_of_interest: &HashMap<String, Rc<Box<dyn Any>>>,
         total_display_region: Rc<DisplayRegion>,
         occluded_regions: &mut Vec<Rc<DisplayRegion>>,
     ) -> Result<(Vec<Rc<UiTreeNode>>, Vec<Rc<ChildWithRegion>>, Vec<Rc<ChildWithoutRegion>>, DisplayRegion), &'static str> {
@@ -230,7 +229,7 @@ impl UiTreeNodeExtractor {
     fn get_children_addresses(
         &self,
         node_address: u64,
-        dict_entries_of_interest: &HashMap<String, Arc<Box<dyn Any>>>,
+        dict_entries_of_interest: &HashMap<String, Rc<Box<dyn Any>>>,
     ) -> Result<Vec<u64>, &'static str> {
         let children_dict_entry = dict_entries_of_interest.get("children");
         

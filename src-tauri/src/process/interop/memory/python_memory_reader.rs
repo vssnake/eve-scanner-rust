@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::result;
-use std::sync::Arc;
 use crate::process::interop::ui::python_ui_utils::PythonUiUtils;
 
 pub struct PythonMemoryReader {
@@ -368,7 +367,7 @@ impl PythonMemoryReader {
         &self,
         value_object_address: u64,
         memory_reading_cache: &MemoryReadingCache
-    ) -> Arc<Box<dyn std::any::Any>> {
+    ) -> Rc<Box<dyn std::any::Any>> {
         let result_cache = memory_reading_cache
             .get_dict_entry_value_representation(value_object_address, || {
                 let value_python_type_name =
@@ -378,7 +377,7 @@ impl PythonMemoryReader {
                 let value_python_type_name_option = value_python_type_name.as_ref().ok();
 
                 
-                let generic_representation = Arc::new(Box::new(DictEntryValueGenericRepresentation {
+                let generic_representation = Rc::new(Box::new(DictEntryValueGenericRepresentation {
                     address: value_object_address,
                     python_object_type_name: value_python_type_name_option.cloned(),
                 }) as Box<dyn std::any::Any>);
@@ -399,7 +398,7 @@ impl PythonMemoryReader {
                 }
 
                 specialized_representation.map(|value| {
-                    Arc::new(value) 
+                    Rc::new(value) 
                 })
             });
 

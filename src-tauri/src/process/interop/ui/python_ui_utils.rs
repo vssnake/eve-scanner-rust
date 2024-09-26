@@ -1,8 +1,6 @@
 ﻿use std::any::Any;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
-use std::string;
-use std::sync::Arc;
 use lazy_static::lazy_static;
 use serde::Serialize;
 use serde_json::{to_value, Value};
@@ -153,14 +151,12 @@ fn reading_from_python_type_link(
             (key, memory_reader.get_dict_entry_value_representation(value, cache))
         })
         .collect();
-
-    Ok(Box::new(UiTreeNode {
-        object_address: address,
-        object_type_name: python_object_type_name,
-        dict_entries_of_interest: dict_entries,
-        other_dict_entries_keys: vec![],
-        children: vec![],
-    }))
+    
+    Ok(Box::new(UiTreeNode::new(address,
+                                python_object_type_name,
+                                dict_entries,
+                                vec![],
+                                vec![])))
 }
 
 trait SerializeBox: Any + Send + Sync {
@@ -173,7 +169,7 @@ impl<T: Serialize + Any + Send + Sync> SerializeBox for T {
     }
 }
 
-fn serialize_memory_reading_node_to_json(value: Arc<Box<dyn Any>>) -> Result<Value, &'static str> {
+fn serialize_memory_reading_node_to_json(value: Rc<Box<dyn Any>>) -> Result<Value, &'static str> {
     if let Some(serialize_box) = value.downcast_ref::<Box<dyn SerializeBox>>() {
         serialize_box.serialize_to_value().map_err(|_| "Error al serializar")
     } else {

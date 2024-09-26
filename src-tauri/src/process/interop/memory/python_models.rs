@@ -1,5 +1,4 @@
 ﻿use std::rc::Rc;
-use std::sync::Arc;
 
 // Define a struct similar to PyDictEntry
 #[derive(Debug)]
@@ -20,7 +19,7 @@ pub struct DictEntryValueGenericRepresentation {
 #[derive(Debug)]
 pub struct DictEntry {
     pub key: String,
-    pub value: Arc<Box<dyn std::any::Any>>, // Rust doesn't have a direct equivalent to C#'s `object`, so we use a trait object
+    pub value: Rc<Box<dyn std::any::Any>>, // Rust doesn't have a direct equivalent to C#'s `object`, so we use a trait object
 }
 
 // Define a struct similar to LongInt
