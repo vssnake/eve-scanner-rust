@@ -1,8 +1,6 @@
 ﻿use sysinfo::System;
 
-pub struct ObtainPidProcess {
-
-}
+pub struct ObtainPidProcess {}
 
 impl ObtainPidProcess {
     pub fn execute(process_name: &str) -> Result<u32, String> {

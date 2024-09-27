@@ -1,12 +1,11 @@
 ﻿#[derive(Debug)]
-pub  enum IntWrapper {
+pub enum IntWrapper {
     Int32(i32),
     Int64(i64),
 }
 
 
 impl IntWrapper {
-
     pub fn new_from_i32(value: i32) -> Self {
         IntWrapper::Int32(value)
     }
@@ -16,7 +15,7 @@ impl IntWrapper {
         IntWrapper::Int64(value)
     }
 
- 
+
     pub fn get_i64(&self) -> i64 {
         match *self {
             IntWrapper::Int32(value) => value as i64,
@@ -24,7 +23,7 @@ impl IntWrapper {
         }
     }
 
-    
+
     pub fn get_i32(&self) -> Option<i32> {
         match *self {
             IntWrapper::Int32(value) => Some(value),

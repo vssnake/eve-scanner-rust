@@ -1,39 +1,38 @@
-﻿#[cfg(windows)]
-
-use crate::process::interop::memory::memory_region::MemoryRegion;
+﻿use crate::eve::interop::memory::models::memory_region::MemoryRegion;
+#[cfg(windows)]
 use winapi::ctypes::c_void;
 use winapi::shared::minwindef::DWORD;
 use winapi::um::handleapi::CloseHandle;
 use winapi::um::memoryapi::{ReadProcessMemory, VirtualQueryEx};
 use winapi::um::processthreadsapi::OpenProcess;
-use winapi::um::winnt::{HANDLE, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ,
-                        MEMORY_BASIC_INFORMATION, PAGE_GUARD, PAGE_NOACCESS, MEM_COMMIT};
+use winapi::um::winnt::{
+    HANDLE, MEMORY_BASIC_INFORMATION, MEM_COMMIT, PAGE_GUARD, PAGE_NOACCESS,
+    PROCESS_QUERY_INFORMATION, PROCESS_VM_READ,
+};
 
 pub struct WindowsMemoryReader {
     process_handle: HANDLE,
-
 }
 
 impl WindowsMemoryReader {
     pub fn new(process_id: u32) -> Option<Self> {
-        let process_handle = unsafe {
-            OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, 0, process_id)
-        };
+        let process_handle =
+            unsafe { OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, 0, process_id) };
 
         if process_handle.is_null() {
             None
         } else {
-            Some(WindowsMemoryReader {
-                process_handle,
-            })
+            Some(WindowsMemoryReader { process_handle })
         }
     }
 }
 
-impl WindowsMemoryReader  {
-
-    pub(crate) fn read_bytes(&self, start_address: u64, length: u64) -> Result<Vec<u8>, &'static str> {
-
+impl WindowsMemoryReader {
+    pub(crate) fn read_bytes(
+        &self,
+        start_address: u64,
+        length: u64,
+    ) -> Result<Vec<u8>, &'static str> {
         let mut buffer = vec![0u8; length as usize];
         let mut number_of_bytes_read: usize = 0;
 
@@ -54,13 +53,13 @@ impl WindowsMemoryReader  {
         }
     }
 
-
     pub(crate) fn read_commited_region(&self) -> Vec<MemoryRegion> {
         let mut committed_regions = Vec::new();
         let mut address = 0;
 
         loop {
-            let mut memory_basic_information: MEMORY_BASIC_INFORMATION = unsafe { std::mem::zeroed() };
+            let mut memory_basic_information: MEMORY_BASIC_INFORMATION =
+                unsafe { std::mem::zeroed() };
             let result = unsafe {
                 VirtualQueryEx(
                     self.process_handle,
@@ -76,16 +75,17 @@ impl WindowsMemoryReader  {
 
             const PAGE_PROTECT_MASK: DWORD = PAGE_NOACCESS | PAGE_GUARD;
 
-
             if (memory_basic_information.Protect & PAGE_PROTECT_MASK) == 0
-                && memory_basic_information.State == MEM_COMMIT {
-                committed_regions.push( MemoryRegion {
+                && memory_basic_information.State == MEM_COMMIT
+            {
+                committed_regions.push(MemoryRegion {
                     base_address: memory_basic_information.BaseAddress as u64,
                     length: memory_basic_information.RegionSize as u64,
                 });
             }
 
-            address = memory_basic_information.BaseAddress as usize + memory_basic_information.RegionSize;
+            address =
+                memory_basic_information.BaseAddress as usize + memory_basic_information.RegionSize;
         }
 
         committed_regions

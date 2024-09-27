@@ -1,31 +1,23 @@
-﻿use std::any::Any;
+﻿use crate::eve::ui::models::child_of_node::{ChildWithRegion, ChildWithoutRegion};
+use crate::eve::ui::models::display_region::DisplayRegion;
+use std::any::Any;
 use std::collections::HashMap;
 use std::rc::Rc;
-use serde::{Serialize, Deserialize};
-use crate::eve::ui::common::common::{ChildOfNodeWithDisplayRegion, ChildWithRegion, ChildWithoutRegion, ColorComponents, DisplayRegion};
-use crate::process::interop::memory::python_models::DictEntryValueGenericRepresentation;
-use crate::process::interop::ui::int_wrapper::IntWrapper;
 
 #[derive(Debug)]
 pub struct UiTreeNode {
     pub object_address: u64,
     pub object_type_name: String,
-    pub dict_entries_of_interest: HashMap<String, Rc<Box<dyn std::any::Any>>>,
-    
+    pub dict_entries_of_interest: HashMap<String, Rc<Box<dyn Any>>>,
     pub other_dict_entries_keys: Vec<String>,
     pub children: Vec<Rc<UiTreeNode>>,
 }
 
-#[derive(Debug)]
-pub struct Bunch {
-    pub entries_of_interest: serde_json::Map<String, serde_json::Value>,
-}
-
 impl UiTreeNode {
     pub fn enumerate_self_and_descendants(&self) -> Vec<&Rc<UiTreeNode>> {
-        let mut result:Vec<&Rc<UiTreeNode>> = Vec::new();
+        let mut result: Vec<&Rc<UiTreeNode>> = Vec::new();
         let test = &self.children;
-        for child in  test {
+        for child in test {
             result.extend(child.enumerate_self_and_descendants())
         }
         result
@@ -38,9 +30,6 @@ impl UiTreeNode {
         other_dict_entries_keys: Vec<String>,
         children: Vec<Rc<UiTreeNode>>,
     ) -> UiTreeNode {
-        
-        
-        
         UiTreeNode {
             object_address,
             object_type_name,
@@ -48,6 +37,19 @@ impl UiTreeNode {
             other_dict_entries_keys,
             children,
         }
+    }
+
+    pub fn list_descendants_in_ui_tree_node(children: Vec<Rc<UiTreeNode>>) -> Vec<Rc<UiTreeNode>> {
+        let mut descendants: Vec<Rc<UiTreeNode>> = Vec::new();
+
+        for child in children {
+            descendants.push(Rc::clone(&child));
+            descendants.extend(UiTreeNode::list_descendants_in_ui_tree_node(
+                child.children.iter().map(|c| Rc::clone(c)).collect(),
+            ));
+        }
+
+        descendants
     }
 }
 
@@ -60,10 +62,9 @@ pub struct UITreeNodeWithDisplayRegion {
     pub total_display_region_visible: DisplayRegion,
 }
 
-impl UITreeNodeWithDisplayRegion {
-}
+impl UITreeNodeWithDisplayRegion {}
 
 pub struct ScrollControls {
     pub ui_node: Rc<UITreeNodeWithDisplayRegion>,
-    pub scroll_handle: Option<Rc<UITreeNodeWithDisplayRegion>>
+    pub scroll_handle: Option<Rc<UITreeNodeWithDisplayRegion>>,
 }

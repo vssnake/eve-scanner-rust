@@ -1,26 +1,25 @@
-﻿use std::any::Any;
-use std::collections::{HashMap, HashSet};
-use std::rc::Rc;
+﻿use crate::eve::interop::memory::memory_reading_cache::MemoryReadingCache;
+use crate::eve::interop::memory::models::dict_entry::DictEntry;
+use crate::eve::interop::memory::python_memory_reader::PythonMemoryReader;
+use crate::eve::ui::common::common::{Bunch, ColorComponents};
+use crate::eve::ui::models::ui_tree_node::UiTreeNode;
 use lazy_static::lazy_static;
 use serde::Serialize;
 use serde_json::{to_value, Value};
-use crate::eve::ui::common::common::ColorComponents;
-use crate::process::interop::memory::memory_reading_cache::MemoryReadingCache;
-use crate::process::interop::memory::python_memory_reader::PythonMemoryReader;
-use crate::process::interop::memory::python_models::DictEntry;
-use crate::process::interop::ui::ui_tree_node::{Bunch, UiTreeNode};
+use std::any::Any;
+use std::collections::{HashMap, HashSet};
+use std::rc::Rc;
 
-pub struct PythonUiUtils;
+pub struct PythonTypeExtractor;
 
-impl PythonUiUtils {
-
+impl PythonTypeExtractor {
     pub fn specialized_reading_from_python_type(
         memory_reader: &PythonMemoryReader,
         address: u64,
         value_python_type: &str,
         memory_reading_cache: &MemoryReadingCache,
     ) -> Result<Box<dyn Any>, &'static str> {
-        let handler =  TYPE_HANDLERS.get(value_python_type);
+        let handler = TYPE_HANDLERS.get(value_python_type);
         if handler.is_none() {
             return Err("Failed to find handler for python type");
         }
@@ -32,7 +31,10 @@ impl PythonUiUtils {
     }
 }
 
-fn reading_from_python_type_str(memory_reader: &PythonMemoryReader, address: u64) -> Result<String, &'static str> {
+fn reading_from_python_type_str(
+    memory_reader: &PythonMemoryReader,
+    address: u64,
+) -> Result<String, &'static str> {
     memory_reader.read_python_string_value(address, 0x1000)
 }
 
@@ -43,15 +45,18 @@ fn reading_from_python_type_pycolor(
 ) -> Result<Box<ColorComponents>, &'static str> {
     let py_color_object_memory = memory_reader.read_bytes(address, 0x18);
 
-    if py_color_object_memory.as_ref().map_or(true, |bytes| bytes.len() != 0x18) {
+    if py_color_object_memory
+        .as_ref()
+        .map_or(true, |bytes| bytes.len() != 0x18)
+    {
         return Err("Failed to read pyColorObjectMemory.");
     }
 
-    let dictionary_address = u64::from_le_bytes(
-        py_color_object_memory?[0x10..0x18].try_into().unwrap(),
-    );
+    let dictionary_address =
+        u64::from_le_bytes(py_color_object_memory?[0x10..0x18].try_into().unwrap());
 
-    let dictionary_entries = memory_reader.get_dictionary_entries_with_string_keys(dictionary_address, cache);
+    let dictionary_entries =
+        memory_reader.get_dictionary_entries_with_string_keys(dictionary_address, cache);
 
     if dictionary_entries.is_empty()
         || (!dictionary_entries.contains_key("_r")
@@ -66,7 +71,6 @@ fn reading_from_python_type_pycolor(
         if let Some(&value_address) = dictionary_entries.get(key) {
             let value_as_float = memory_reader.read_python_float_object_value(value_address)?;
             Ok((value_as_float * 255.0) as i32)
-            
         } else {
             Err("Key not found.")
         }
@@ -84,14 +88,14 @@ fn reading_from_python_type_bunch(
     memory_reader: &PythonMemoryReader,
     address: u64,
     cache: &MemoryReadingCache,
-) ->  Result<Box<Bunch>, &'static str> {
+) -> Result<Box<Bunch>, &'static str> {
     let dictionary_entries = memory_reader.get_dictionary_entries_with_string_keys(address, cache);
 
     if dictionary_entries.is_empty() {
         // Failed to read dictionary entries.
         return Err("Failed to read dictionary entries.");
     }
-    
+
     let mut entries_of_interest = Vec::new();
 
     for (key, value) in dictionary_entries {
@@ -120,43 +124,53 @@ fn reading_from_python_type_bunch(
 fn reading_from_python_type_link(
     memory_reader: &PythonMemoryReader,
     address: u64,
-    cache: &MemoryReadingCache
+    cache: &MemoryReadingCache,
 ) -> Result<Box<UiTreeNode>, &'static str> {
-    let python_object_type_name = memory_reader.get_python_type_name_from_python_object_address(address, cache)?;
+    let python_object_type_name =
+        memory_reader.get_python_type_name_from_python_object_address(address, cache)?;
 
     let link_memory = memory_reader.read_bytes(address, 0x40)?;
-    
-    let link_memory_as_long_memory: Vec<u64> = link_memory.chunks(8).map(|chunk| {
-        u64::from_le_bytes(chunk.try_into().unwrap())
-    }).collect();
+
+    let link_memory_as_long_memory: Vec<u64> = link_memory
+        .chunks(8)
+        .map(|chunk| u64::from_le_bytes(chunk.try_into().unwrap()))
+        .collect();
 
     /*
      * 2024-05-26 observed a reference to a dictionary object at offset 6 * 4 bytes.
      * */
 
-    let first_dict_reference = link_memory_as_long_memory.iter().find(|&&reference| {
-        let result = memory_reader.get_python_type_name_from_python_object_address(reference, cache);
-        result.is_ok() && result.unwrap() == "dict"
-    }).cloned();
+    let first_dict_reference = link_memory_as_long_memory
+        .iter()
+        .find(|&&reference| {
+            let result =
+                memory_reader.get_python_type_name_from_python_object_address(reference, cache);
+            result.is_ok() && result.unwrap() == "dict"
+        })
+        .cloned();
 
     if (first_dict_reference.is_none()) {
         return Err("Failed to find dictionary reference.");
     }
 
-
     let dict_entries = memory_reader
         .get_dictionary_entries_with_string_keys(first_dict_reference.unwrap(), cache)
         .into_iter()
         .map(|(key, value)| {
-            (key, memory_reader.get_dict_entry_value_representation(value, cache))
+            (
+                key,
+                memory_reader.get_dict_entry_value_representation(value, cache),
+            )
         })
         .collect();
-    
-    Ok(Box::new(UiTreeNode::new(address,
-                                python_object_type_name,
-                                dict_entries,
-                                vec![],
-                                vec![])))
+
+    Ok(Box::new(UiTreeNode::new(
+        address,
+        python_object_type_name,
+        dict_entries,
+        vec![],
+        vec![],
+    )))
 }
 
 trait SerializeBox: Any + Send + Sync {
@@ -171,7 +185,9 @@ impl<T: Serialize + Any + Send + Sync> SerializeBox for T {
 
 fn serialize_memory_reading_node_to_json(value: Rc<Box<dyn Any>>) -> Result<Value, &'static str> {
     if let Some(serialize_box) = value.downcast_ref::<Box<dyn SerializeBox>>() {
-        serialize_box.serialize_to_value().map_err(|_| "Error al serializar")
+        serialize_box
+            .serialize_to_value()
+            .map_err(|_| "Error al serializar")
     } else {
         Err("El valor no es serializable.")
     }
@@ -179,23 +195,69 @@ fn serialize_memory_reading_node_to_json(value: Rc<Box<dyn Any>>) -> Result<Valu
 
 type HandlerFn = fn(PythonMemoryReader, u64, MemoryReadingCache) -> Result<dyn Any, &'static str>;
 
-
 lazy_static! {
-    static ref TYPE_HANDLERS: HashMap<String, fn(&PythonMemoryReader, u64, &MemoryReadingCache) -> Result<Box<dyn Any>, &'static str>> = {
-        
-        let mut m: HashMap<String, fn(&PythonMemoryReader, u64, &MemoryReadingCache) -> Result<Box<dyn Any>, &'static str>> = HashMap::new();
-        m.insert(String::from("str"), |mr: &PythonMemoryReader, addr, _cache| reading_from_python_type_str(mr, addr).map(|value| Box::new(value) as Box<dyn Any>));
-        m.insert(String::from("unicode"), |mr: &PythonMemoryReader, addr, _cache | mr.reading_from_python_type_unicode(addr).map(|value| Box::new(value) as Box<dyn Any>));
-        m.insert(String::from("int"), |mr: &PythonMemoryReader, addr, _cache| mr.reading_from_python_type_int(addr).map(|value| Box::new(value) as Box<dyn Any>));
-        m.insert(String::from("bool"), |mr: &PythonMemoryReader, addr, _cache| mr.reading_from_python_type_bool(addr).map(|value| Box::new(value) as Box<dyn Any>));
-        m.insert(String::from("float"), |mr: &PythonMemoryReader, addr, _cache| mr.read_python_float_object_value(addr).map(|value| Box::new(value) as Box<dyn Any>));
-        m.insert(String::from("PyColor"), |mr: &PythonMemoryReader, addr, cache| reading_from_python_type_pycolor(mr, addr, cache).map(|value| value as Box<dyn Any>));
-        m.insert(String::from("Bunch"), |mr: &PythonMemoryReader, addr, cache| reading_from_python_type_bunch(mr, addr, cache).map(|value| value as Box<dyn Any>));
-        m.insert(String::from("Link"), |mr: &PythonMemoryReader, addr, cache| reading_from_python_type_link(mr, addr, cache).map(|value| value as Box<dyn Any>));
+    static ref TYPE_HANDLERS: HashMap<
+        String,
+        fn(&PythonMemoryReader, u64, &MemoryReadingCache) -> Result<Box<dyn Any>, &'static str>,
+    > = {
+        let mut m: HashMap<
+            String,
+            fn(&PythonMemoryReader, u64, &MemoryReadingCache) -> Result<Box<dyn Any>, &'static str>,
+        > = HashMap::new();
+        m.insert(
+            String::from("str"),
+            |mr: &PythonMemoryReader, addr, _cache| {
+                reading_from_python_type_str(mr, addr).map(|value| Box::new(value) as Box<dyn Any>)
+            },
+        );
+        m.insert(
+            String::from("unicode"),
+            |mr: &PythonMemoryReader, addr, _cache| {
+                mr.reading_from_python_type_unicode(addr)
+                    .map(|value| Box::new(value) as Box<dyn Any>)
+            },
+        );
+        m.insert(
+            String::from("int"),
+            |mr: &PythonMemoryReader, addr, _cache| {
+                mr.reading_from_python_type_int(addr)
+                    .map(|value| Box::new(value) as Box<dyn Any>)
+            },
+        );
+        m.insert(
+            String::from("bool"),
+            |mr: &PythonMemoryReader, addr, _cache| {
+                mr.reading_from_python_type_bool(addr)
+                    .map(|value| Box::new(value) as Box<dyn Any>)
+            },
+        );
+        m.insert(
+            String::from("float"),
+            |mr: &PythonMemoryReader, addr, _cache| {
+                mr.read_python_float_object_value(addr)
+                    .map(|value| Box::new(value) as Box<dyn Any>)
+            },
+        );
+        m.insert(
+            String::from("PyColor"),
+            |mr: &PythonMemoryReader, addr, cache| {
+                reading_from_python_type_pycolor(mr, addr, cache).map(|value| value as Box<dyn Any>)
+            },
+        );
+        m.insert(
+            String::from("Bunch"),
+            |mr: &PythonMemoryReader, addr, cache| {
+                reading_from_python_type_bunch(mr, addr, cache).map(|value| value as Box<dyn Any>)
+            },
+        );
+        m.insert(
+            String::from("Link"),
+            |mr: &PythonMemoryReader, addr, cache| {
+                reading_from_python_type_link(mr, addr, cache).map(|value| value as Box<dyn Any>)
+            },
+        );
         m
     };
-    
-    
     static ref DICT_ENTRIES_OF_INTEREST_KEYS: HashSet<&'static str> = {
         let mut set = HashSet::new();
         set.insert("_top");
@@ -229,6 +291,4 @@ lazy_static! {
         set.insert("isExpanded");
         set
     };
-    
 }
-

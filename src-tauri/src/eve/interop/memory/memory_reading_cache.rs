@@ -2,7 +2,6 @@
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::rc::Rc;
-use winapi::um::winnt::FirmwareTypeUnknown;
 
 pub struct MemoryReadingCache {
     python_type_name_from_python_object_address: Rc<RefCell<HashMap<u64, String>>>,
@@ -52,13 +51,13 @@ impl MemoryReadingCache {
         F: FnOnce() -> Result<V, &'static str>,
     {
         let mut cache_lock = cache.borrow_mut();
-        
+
         if let Some(from_cache) = cache_lock.get(&key) {
             return Some(from_cache.clone());
         }
-        
+
         let fresh = get_fresh();
-        
+
         if fresh.is_ok() {
             let result = fresh.unwrap();
             cache_lock.insert(key, result.clone());

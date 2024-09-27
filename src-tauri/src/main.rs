@@ -6,22 +6,19 @@
 }*/
 extern crate core;
 
-use std::rc::Rc;
-use log::info;
-use crate::eve::ui::common::common::{ChildWithRegion, ChildWithoutRegion};
 use crate::operations::extract_possible_root_address::ExtractPossibleRootAddress;
 use crate::operations::obtain_pid_process::ObtainPidProcess;
 use crate::operations::ui_tree_node_extractor::UiTreeNodeExtractor;
-use crate::process::interop::memory::windows_memory_reader::WindowsMemoryReader;
-use crate::process::interop::ui::ui_tree_node::{UITreeNodeWithDisplayRegion, UiTreeNode};
+use eve::interop::memory::windows_memory_reader::WindowsMemoryReader;
+use eve::ui::models::ui_tree_node::{UITreeNodeWithDisplayRegion, UiTreeNode};
+use log::info;
+use std::rc::Rc;
 
-mod process;
 mod operations;
 mod eve;
 
+
 fn main() {
-
-
     let process_id = ObtainPidProcess::execute("exefile").unwrap();
 
     let possible_root_address = ExtractPossibleRootAddress::new().execute(process_id).unwrap();
@@ -29,7 +26,7 @@ fn main() {
     let memoryReader = WindowsMemoryReader::new(process_id).unwrap();
 
     let uiExtractor = UiTreeNodeExtractor::new(process_id);
-    
+
     let mut ui_tree_nodes: Vec<Rc<UITreeNodeWithDisplayRegion>> = Vec::new();
     for address in possible_root_address {
         info!("Possible root address: {:#X}", address);
@@ -42,5 +39,4 @@ fn main() {
 
 
     info!("It works!");
-
 }

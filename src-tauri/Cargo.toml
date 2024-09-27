@@ -27,4 +27,4 @@ lazy_static = { version = "1.5.0", features = [] }
 
 
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3", features = ["winuser","winnt","winbase","processthreadsapi","memoryapi","handleapi","minwindef","basetsd"] }
+winapi = { version = "0.3", features = ["winuser", "winnt", "winbase", "processthreadsapi", "memoryapi", "handleapi", "minwindef", "basetsd"] }
