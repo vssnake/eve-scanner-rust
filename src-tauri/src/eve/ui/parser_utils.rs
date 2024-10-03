@@ -30,7 +30,7 @@ impl ParserUtils {
 
         let mut cells_texts = HashMap::new();;
         let leftmost_header = &entry_headers[0];
-        let all_texts_with_regions = ParserUtils::get_all_contained_display_texts_with_region(Some(list_view_entry_node));
+        let all_texts_with_regions = ParserUtils::get_all_contained_display_texts_with_region(&list_view_entry_node);
 
         for (cell_text, cell) in all_texts_with_regions {
             let distance_from_leftmost_header =
@@ -64,11 +64,11 @@ impl ParserUtils {
     }
     
     pub fn get_all_contained_display_texts_with_region(
-        ui_node: Option<Rc<UITreeNodeWithDisplayRegion>>,
+        ui_node: &Rc<UITreeNodeWithDisplayRegion>,
     ) -> Vec<(String, Rc<UITreeNodeWithDisplayRegion>)> {
         let mut result = Vec::new();
 
-        if let Some(ui_node) = ui_node {
+        
             let descendant_children = DisplayRegionUtils::list_descendants_with_display_region(&ui_node.child_with_region);
 
             for descendant in descendant_children {
@@ -78,7 +78,7 @@ impl ParserUtils {
                     result.push((display_text, descendant.node.clone()));
                 }
             }
-        }
+        
 
         result
     }
