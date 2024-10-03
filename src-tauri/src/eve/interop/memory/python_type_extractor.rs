@@ -1,14 +1,14 @@
 ﻿use crate::eve::interop::memory::memory_reading_cache::MemoryReadingCache;
 use crate::eve::interop::memory::models::dict_entry::DictEntry;
 use crate::eve::interop::memory::python_memory_reader::PythonMemoryReader;
-use crate::eve::ui::common::common::{Bunch, ColorComponents};
-use crate::eve::ui::models::ui_tree_node::UiTreeNode;
 use lazy_static::lazy_static;
 use serde::Serialize;
 use serde_json::{to_value, Value};
 use std::any::Any;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
+use crate::eve::ui_tree_node::common::common::{Bunch, ColorComponents};
+use crate::eve::ui_tree_node::models::ui_tree_node::UiTreeNode;
 
 pub struct PythonTypeExtractor;
 

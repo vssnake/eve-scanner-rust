@@ -1,14 +1,14 @@
-﻿use crate::eve::ui::models::ui_tree_node::{UITreeNodeWithDisplayRegion, UiTreeNode};
-use crate::eve::utils::extract_int_from_int_or_string;
+﻿use crate::eve::utils::extract_int_from_int_or_string;
 use lazy_static::lazy_static;
 use std::any::Any;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
+use crate::eve::ui_tree_node::models::ui_tree_node::{UITreeNodeWithDisplayRegion, UiTreeNode};
 
 pub struct UiUtils;
 
 impl UiUtils {
-    pub(crate) fn fixed_number_from_property_name(
+    pub fn fixed_number_from_property_name(
         property_name: &str,
         entries_of_interest: &HashMap<String, Rc<Box<dyn Any>>>,
     ) -> Option<i32> {
@@ -17,7 +17,7 @@ impl UiUtils {
             .and_then(|json_value| extract_int_from_int_or_string(json_value))
     }
 
-    pub(crate) fn fixed_number_from_ui_node(property_name: &str, ui_node: &Rc<UiTreeNode>) -> Option<i32> {
+    pub fn fixed_number_from_ui_node(property_name: &str, ui_node: &Rc<UiTreeNode>) -> Option<i32> {
         let property_to_convert_option = ui_node
             .dict_entries_of_interest
             .get(property_name);

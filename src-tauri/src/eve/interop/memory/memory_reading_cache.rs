@@ -50,16 +50,18 @@ impl MemoryReadingCache {
         V: Clone,
         F: FnOnce() -> Result<V, &'static str>,
     {
-        let mut cache_lock = cache.borrow_mut();
-
-        if let Some(from_cache) = cache_lock.get(&key) {
-            return Some(from_cache.clone());
+        {
+            let cache_lock = cache.borrow();
+            if let Some(from_cache) = cache_lock.get(&key) {
+                return Some(from_cache.clone());
+            }
         }
 
         let fresh = get_fresh();
 
         if fresh.is_ok() {
             let result = fresh.unwrap();
+            let mut cache_lock = cache.borrow_mut();
             cache_lock.insert(key, result.clone());
             return Some(result);
         }

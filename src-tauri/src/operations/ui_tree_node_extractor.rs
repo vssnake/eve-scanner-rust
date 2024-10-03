@@ -3,21 +3,21 @@ use crate::eve::interop::memory::models::dict_entry_representation::PyDictEntryR
 use crate::eve::interop::memory::python_memory_reader::PythonMemoryReader;
 use crate::eve::interop::memory::utils::MemoryUtils;
 use crate::eve::interop::memory::windows_memory_reader::WindowsMemoryReader;
-use crate::eve::interop::ui::python_type_extractor::PythonTypeExtractor;
-use crate::eve::ui::models::child_of_node::{ChildWithRegion, ChildWithoutRegion};
-use crate::eve::ui::models::display_region::DisplayRegion;
-use crate::eve::ui::models::ui_tree_node::{UITreeNodeWithDisplayRegion, UiTreeNode};
-use crate::eve::ui::ui_constants::{UiConstants, UiZonesEnum, UI_ZONES};
-use crate::eve::ui::utils::display_region_utils::DisplayRegionUtils;
+use crate::eve::interop::memory::python_type_extractor::PythonTypeExtractor;
 use std::any::Any;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use log::debug;
+use crate::eve::ui_tree_node::models::child_of_node::{ChildWithRegion, ChildWithoutRegion};
+use crate::eve::ui_tree_node::models::display_region::DisplayRegion;
+use crate::eve::ui_tree_node::models::ui_tree_node::{UITreeNodeWithDisplayRegion, UiTreeNode};
+use crate::eve::ui_tree_node::ui_constants::{UiConstants, UiZonesEnum, UI_ZONES};
+use crate::eve::ui_tree_node::utils::display_region_utils::DisplayRegionUtils;
 
 pub struct UiTreeNodeExtractor {
     windows_memory_reader_ext: PythonMemoryReader,
     memory_reader: Rc<WindowsMemoryReader>,
-    children_with_zones: RefCell<HashMap<UiZonesEnum, Vec<Rc<UITreeNodeWithDisplayRegion>>>>,
     memory_reading_cache: MemoryReadingCache,
 }
 
@@ -28,7 +28,6 @@ impl UiTreeNodeExtractor {
         UiTreeNodeExtractor {
             windows_memory_reader_ext: PythonMemoryReader::new(&memory_reader),
             memory_reader: Rc::clone(&memory_reader),
-            children_with_zones: RefCell::new(UiConstants::initialize_mapper()),
             memory_reading_cache: MemoryReadingCache::new(),
         }
     }
@@ -37,8 +36,13 @@ impl UiTreeNodeExtractor {
         &self,
         address: u64,
         max_depth: i32,
-    ) -> Result<Rc<UITreeNodeWithDisplayRegion>, &'static str> {
-        self.read_ui_tree_from_address(address, max_depth, None, None)
+    ) -> Result<(Rc<UITreeNodeWithDisplayRegion>,HashMap<UiZonesEnum, Vec<Rc<UITreeNodeWithDisplayRegion>>>), &'static str> {
+        let children_with_zones: RefCell<
+            HashMap<UiZonesEnum, Vec<Rc<UITreeNodeWithDisplayRegion>>>,
+        > = RefCell::new(UiConstants::initialize_mapper());
+        
+        let node = self.read_ui_tree_from_address(address, max_depth, None, None, &children_with_zones);
+        node.map(|node| (node,  children_with_zones.into_inner()))
     }
 
     fn read_ui_tree_from_address(
@@ -47,6 +51,7 @@ impl UiTreeNodeExtractor {
         max_depth: i32,
         total_display_region: Option<Rc<DisplayRegion>>,
         occluded_regions: Option<Vec<Rc<DisplayRegion>>>,
+        children_with_zones: &RefCell<HashMap<UiZonesEnum, Vec<Rc<UITreeNodeWithDisplayRegion>>>>,
     ) -> Result<Rc<UITreeNodeWithDisplayRegion>, &'static str> {
         //let mut cache = cache.unwrap_or_else(MemoryReadingCache::new);
         let ui_node_memory = self.memory_reader.read_bytes(node_address, 0x30)?;
@@ -114,13 +119,13 @@ impl UiTreeNodeExtractor {
             }
 
             if (key_string == "_display") {
-                let result = if let Some(boolean) = dict_entry_value.downcast_ref::<bool>() {
-                    *boolean == false
+                let is_visible = if let Some(boolean) = dict_entry_value.downcast_ref::<bool>() {
+                    *boolean
                 } else {
                     false
                 };
 
-                if result == false {
+                if is_visible == false {
                     return Err("Display is false");
                 }
             }
@@ -148,15 +153,16 @@ impl UiTreeNodeExtractor {
                 &dict_entries_of_interest,
                 Rc::clone(&total_display_region),
                 &mut occluded_regions,
+                children_with_zones,
             )
-                .unwrap_or_else(|_| {
-                    (
-                        Vec::new(),
-                        Vec::new(),
-                        Vec::new(),
-                        DisplayRegion::new(0, 0, 0, 0),
-                    )
-                });
+            .unwrap_or_else(|_| {
+                (
+                    Vec::new(),
+                    Vec::new(),
+                    Vec::new(),
+                    DisplayRegion::new(0, 0, 0, 0),
+                )
+            });
 
         let ui_tree_node = UiTreeNode::new(
             node_address,
@@ -177,13 +183,15 @@ impl UiTreeNodeExtractor {
 
         let node = Rc::new(node_with_display_region);
         // Add the node to the corresponding zone
-        if let Some(zone) = UI_ZONES.get(&node.ui_node.object_type_name.as_str()) {
-            self.children_with_zones
+        /*if let Some(zone) = UI_ZONES.get(&node.ui_node.object_type_name.as_str()) {
+            children_with_zones
                 .borrow_mut()
                 .entry(zone.clone())
                 .or_insert_with(Vec::new)
                 .push(Rc::clone(&node));
-        }
+        }*/
+
+        UiConstants::check_and_insert_inportant_zone(children_with_zones, &node.ui_node.object_type_name, Rc::clone(&node));
 
         Ok(Rc::clone(&node))
     }
@@ -195,6 +203,7 @@ impl UiTreeNodeExtractor {
         dict_entries_of_interest: &HashMap<String, Rc<Box<dyn Any>>>,
         total_display_region: Rc<DisplayRegion>,
         occluded_regions: &mut Vec<Rc<DisplayRegion>>,
+        children_with_zones: &RefCell<HashMap<UiZonesEnum, Vec<Rc<UITreeNodeWithDisplayRegion>>>>,
     ) -> Result<
         (
             Vec<Rc<UiTreeNode>>,
@@ -215,12 +224,18 @@ impl UiTreeNodeExtractor {
         let mut occluded_regions_from_siblings = Vec::new();
 
         for child_address in child_addresses {
-            let child = self.read_ui_tree_from_address(
+            let child_result = self.read_ui_tree_from_address(
                 child_address,
                 max_depth - 1,
                 Some(Rc::clone(&total_display_region)),
                 Some(occluded_regions.clone()),
-            )?;
+                children_with_zones,
+            );
+            
+            if child_result.is_err() {
+                continue;
+            }
+            let child = child_result.unwrap();
 
             let pointer_total_display_region = &total_display_region;
             let child_result = DisplayRegionUtils::create_display_region_node_with_offset(
@@ -291,6 +306,10 @@ impl UiTreeNodeExtractor {
 
         if children_dict_entry.is_none() {
             return Err("Not found children key in dict entries of interest");
+        }
+        
+        if !children_dict_entry.unwrap().is::<PyDictEntryRepresentation>() {
+            return Err("Children entry is not a PyDictEntryRepresentation");
         }
 
         let children_entry_object_address = children_dict_entry

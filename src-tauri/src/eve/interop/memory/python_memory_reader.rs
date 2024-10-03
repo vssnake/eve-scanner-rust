@@ -6,9 +6,10 @@ use crate::eve::interop::memory::models::dict_entry_representation::PyDictEntryR
 use crate::eve::interop::memory::models::int_wrapper::IntWrapper;
 use crate::eve::interop::memory::models::py_dict_entry::PyDictEntry;
 use crate::eve::interop::memory::utils::MemoryUtils;
-use crate::eve::interop::ui::python_type_extractor::PythonTypeExtractor;
+use crate::eve::interop::memory::python_type_extractor::PythonTypeExtractor;
 use std::collections::HashMap;
 use std::rc::Rc;
+use log::debug;
 
 pub struct PythonMemoryReader {
     memory_reader: Rc<WindowsMemoryReader>,
@@ -134,7 +135,10 @@ impl PythonMemoryReader {
             return Err("Failed to read string bytes or the length of the string bytes is not equal to the string object size");
         }
 
-        Ok(String::from_utf8_lossy(&string_bytes).into_owned())
+        let text = String::from_utf8_lossy(&string_bytes).into_owned();
+
+        //debug!("{}",text);
+        Ok(text)
     }
 
     pub fn reading_from_python_type_unicode(&self, address: u64) -> Result<String, &'static str> {
@@ -177,7 +181,14 @@ impl PythonMemoryReader {
             return Err("Failed to read string bytes");
         }
 
-        Ok(String::from_utf8_lossy(&string_bytes).into_owned())
+        let utf16_words: Vec<u16> = string_bytes
+            .chunks_exact(2)
+            .map(|chunk| u16::from_ne_bytes(chunk.try_into().unwrap())) // Convierte cada par de bytes a un u16
+            .collect();
+
+        let text = String::from_utf16(&utf16_words).map_err(|_| "Failed to convert UTF-16 to UTF-8")?;
+        //debug!("{}",text);
+        Ok(text)
     }
 
     pub fn reading_from_python_type_bool(&self, address: u64) -> Result<bool, &'static str> {

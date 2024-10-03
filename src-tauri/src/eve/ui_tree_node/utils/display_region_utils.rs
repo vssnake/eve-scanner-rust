@@ -1,12 +1,10 @@
-﻿use crate::eve::ui::models::child_of_node::{
-    ChildOfNodeWithDisplayRegion, ChildWithRegion, ChildWithoutRegion,
-};
-use crate::eve::ui::models::display_region::DisplayRegion;
-use crate::eve::ui::models::ui_tree_node::{UITreeNodeWithDisplayRegion, UiTreeNode};
-use crate::eve::ui::utils::utils::UiUtils;
-use std::any::Any;
+﻿use std::any::Any;
 use std::collections::HashMap;
 use std::rc::Rc;
+use crate::eve::ui_tree_node::models::child_of_node::{ChildOfNodeWithDisplayRegion, ChildWithRegion, ChildWithoutRegion};
+use crate::eve::ui_tree_node::models::display_region::DisplayRegion;
+use crate::eve::ui_tree_node::models::ui_tree_node::{UITreeNodeWithDisplayRegion, UiTreeNode};
+use crate::eve::ui_tree_node::utils::utils::UiUtils;
 
 pub struct DisplayRegionUtils;
 
@@ -137,7 +135,7 @@ impl DisplayRegionUtils {
                     occluded_regions,
                 );
             let child_of_node = Rc::new(ChildWithRegion {
-                node: tree_node_with_display_region,
+                node: Rc::new(tree_node_with_display_region),
             });
             child_of_node
         } else {

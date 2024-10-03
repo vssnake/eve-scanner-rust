@@ -3,3 +3,4 @@ pub mod utils;
 pub mod python_memory_reader;
 pub mod memory_reading_cache;
 pub mod models;
+pub mod python_type_extractor;

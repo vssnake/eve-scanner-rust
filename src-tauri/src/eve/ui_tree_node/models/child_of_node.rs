@@ -1,17 +1,17 @@
-﻿use crate::eve::ui::models::ui_tree_node::{UITreeNodeWithDisplayRegion, UiTreeNode};
-use std::any::Any;
+﻿use std::any::Any;
 use std::rc::Rc;
+use crate::eve::ui_tree_node::models::ui_tree_node::{UITreeNodeWithDisplayRegion, UiTreeNode};
 
 pub trait ChildOfNodeWithDisplayRegion {
     fn has_region(&self) -> bool;
     fn as_any(&self) -> &dyn Any;
     fn as_any_rc(self: Rc<Self>) -> Rc<dyn Any>;
 }
-
+#[derive(Debug)]
 pub struct ChildWithRegion {
-    pub node: UITreeNodeWithDisplayRegion,
+    pub node: Rc<UITreeNodeWithDisplayRegion>,
 }
-
+#[derive(Debug)]
 pub struct ChildWithoutRegion {
     pub node: Rc<UiTreeNode>,
 }

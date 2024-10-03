@@ -1,0 +1,21 @@
+_version: 2
+alliance:
+    en: Alliance
+    es: Alianza
+distance:
+    en: Distance
+    es: Distancia
+is_jamming_me:
+    en: is jamming me
+    es: Me está interfiriendo
+is_warp_disrupting_me:
+    en: is warp disrupting me
+    es: Me está interrumpiendo el salto
+name:
+    en: Name
+    es: Nombre
+type:
+    en: Type
+    es: Tipo
+  
+
