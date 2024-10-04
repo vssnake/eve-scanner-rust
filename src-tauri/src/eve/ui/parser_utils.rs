@@ -67,7 +67,6 @@ impl ParserUtils {
         ui_node: &Rc<UITreeNodeWithDisplayRegion>,
     ) -> Vec<(String, Rc<UITreeNodeWithDisplayRegion>)> {
         let mut result = Vec::new();
-
         
             let descendant_children = DisplayRegionUtils::list_descendants_with_display_region(&ui_node.child_with_region);
 

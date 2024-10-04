@@ -4,6 +4,7 @@ use std::rc::Rc;
 use std::time::{Duration, Instant};
 use log::info;
 use crate::db;
+use crate::eve::interop::gui::windows_utils::WindowsUtils;
 use crate::eve::ui::models::general_window::GeneralWindow;
 use crate::eve::ui_tree_node::models::ui_tree_node::UITreeNodeWithDisplayRegion;
 use crate::eve::ui_tree_node::ui_constants::UiZonesEnum;
@@ -11,11 +12,11 @@ use crate::operations::extract_possible_root_address::ExtractPossibleRootAddress
 use crate::operations::obtain_pid_process::ObtainPidProcess;
 use crate::operations::ui_tree_node_extractor::UiTreeNodeExtractor;
 
-pub struct EveTracker {
-    
+pub struct EveUiTracker {
+     
 }
 
-impl EveTracker {
+impl EveUiTracker {
 
    
     pub fn start_tracker()  {
@@ -27,7 +28,16 @@ impl EveTracker {
             
             let handle = thread::spawn(move || {
                 info!("Starting tracker for process: {:?}", process);
-                EveTracker::extract_ui_from_process(process);
+
+                let windowsAttached = WindowsUtils::get_window_from_process_id(process);
+                
+                if windowsAttached.len() == 0 {
+                    info!("No windows attached to process: {:?}", process);
+                    return;
+                }else{
+                    info!("Windows attached to process: {:?}", windowsAttached);
+                }
+                EveUiTracker::extract_ui_from_process(process);
             });
 
             handles.push(handle);
@@ -37,6 +47,8 @@ impl EveTracker {
         for handle in handles {
             handle.join().unwrap();
         }
+        
+        
     }
     
     fn extract_ui_from_process(process: u32) {

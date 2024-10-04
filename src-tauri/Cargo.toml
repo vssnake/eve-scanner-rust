@@ -27,11 +27,6 @@ lazy_static = { version = "1.5.0", features = [] }
 env_logger = "0.11.5"
 simple_logger = "5.0.0"
 rust-i18n = "3"
-
-[target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3.9", features = ["winuser", "winnt", "winbase", "processthreadsapi", "memoryapi", "handleapi", "minwindef", "basetsd", "consoleapi"] }
-
-
 # `bundled` causes us to automatically compile and link in an up to date
 # version of SQLite for you. This avoids many common build issues, and
 # avoids depending on the version of SQLite on the users system (or your
@@ -42,3 +37,18 @@ winapi = { version = "0.3.9", features = ["winuser", "winnt", "winbase", "proces
 # libraries built around `rusqlite` should probably not enable it, which
 # is why it is not a default feature -- it could become hard to disable.
 rusqlite = { version = "0.32.0", features = ["bundled"] }
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3.9", features = ["winuser", "winnt", "winbase", "processthreadsapi", "memoryapi", "handleapi", "minwindef", "basetsd", "consoleapi"] }
+
+[dependencies.windows]
+version = "0.58.0"
+features = [
+    "Data_Xml_Dom",
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_System_Threading",
+    "Win32_UI_WindowsAndMessaging",
+]
+
+

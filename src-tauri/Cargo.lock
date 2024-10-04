@@ -3468,6 +3468,7 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-shell",
  "winapi",
+ "windows 0.58.0",
 ]
 
 [[package]]

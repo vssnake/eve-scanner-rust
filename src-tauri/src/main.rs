@@ -24,7 +24,7 @@ use winapi::um::consoleapi::AllocConsole;
 use crate::eve::ui::models::general_window::GeneralWindow;
 use crate::eve::ui_tree_node::models::ui_tree_node::UITreeNodeWithDisplayRegion;
 use crate::eve::ui_tree_node::ui_constants::UiZonesEnum;
-use crate::operations::eve_tracker::EveTracker;
+use crate::operations::eve_ui_tracker::EveUiTracker;
 
 mod operations;
 mod eve;
@@ -49,6 +49,6 @@ fn main() {
 
     info!("Starting Eve Tracker");
 
-    EveTracker::start_tracker();
+    EveUiTracker::start_tracker();
 }
 
