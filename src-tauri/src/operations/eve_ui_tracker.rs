@@ -1,57 +1,148 @@
 ﻿use std::collections::HashMap;
-use std::{process, thread};
+use std::{fs, process, thread};
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
+use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
-use log::info;
+use log::{error, info};
+use serde::Serialize;
+use serde_json::to_string;
+use tauri::{Emitter, Window};
 use crate::db;
 use crate::eve::interop::gui::windows_utils::WindowsUtils;
 use crate::eve::ui::models::general_window::GeneralWindow;
 use crate::eve::ui_tree_node::models::ui_tree_node::UITreeNodeWithDisplayRegion;
 use crate::eve::ui_tree_node::ui_constants::UiZonesEnum;
+use crate::eve::ui_tree_node::utils::utils::UiUtils;
 use crate::operations::extract_possible_root_address::ExtractPossibleRootAddress;
+use crate::operations::gui_simulation::GuiSimulation;
 use crate::operations::obtain_pid_process::ObtainPidProcess;
 use crate::operations::ui_tree_node_extractor::UiTreeNodeExtractor;
 
+#[derive(Debug)]
 pub struct EveUiTracker {
-     
+    handles: HashMap<u32,JoinHandle<()>>,
+    eve_ui_status: HashMap<u32,EveUiStatus>,
+    window: Arc<Window>
+}
+
+#[derive(Debug, Serialize, Clone)]
+enum EveUiTrackerStatus {
+    Running,
+    Stopped
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct EveUiStatus {
+    pub process_id: u32,
+    pub status: EveUiTrackerStatus,
+    pub error: Option<String>,
+    pub general_window: Option<String>,
+    pub ms_processing: u32,
 }
 
 impl EveUiTracker {
-
+    
+    pub fn new(window: Arc<Window>) -> Self {
+        EveUiTracker {
+            handles: HashMap::new(),
+            eve_ui_status: HashMap::new(),
+            window
+        }
+    }
+    
+    fn send_error(&mut self, process: u32, error: String){
+        let eve_status = self.eve_ui_status.get_mut(&process).unwrap();
+        
+        eve_status.error = Some(error);
+        
+        self.send_event(process);
+    }
    
-    pub fn start_tracker()  {
-        let processes = ObtainPidProcess::execute("exefile").unwrap();
+    pub fn start_tracker(&mut self, process: u32,tracker: Arc<Mutex<Self>>) {
+        let cloned_tracker = Arc::clone(&tracker);
 
-        let mut handles = vec![];
-        
-        for process in processes {
+        self.eve_ui_status.insert(process, EveUiStatus {
+            process_id: process,
+            status: EveUiTrackerStatus::Running,
+            error: None,
+            general_window: None,
+            ms_processing: 0
+        });
+
+        let handle =thread::spawn(move || {
             
-            let handle = thread::spawn(move || {
-                info!("Starting tracker for process: {:?}", process);
-
-                let windowsAttached = WindowsUtils::get_window_from_process_id(process);
-                
-                if windowsAttached.len() == 0 {
-                    info!("No windows attached to process: {:?}", process);
-                    return;
-                }else{
-                    info!("Windows attached to process: {:?}", windowsAttached);
-                }
-                EveUiTracker::extract_ui_from_process(process);
-            });
-
-            handles.push(handle);
             
-        }
+            info!("Starting tracker for process: {:?}", process);
 
-        for handle in handles {
-            handle.join().unwrap();
-        }
+            let mut this = cloned_tracker.lock().unwrap();
+
+            this.extract_ui_from_process(process);
+
+            let eve_status = this.eve_ui_status.get_mut(&process).unwrap();
+
+            eve_status.status = EveUiTrackerStatus::Running;
+
+            this.handles.remove(&process);
+
+            let eve_status = this.eve_ui_status.get_mut(&process).unwrap();
+
+            eve_status.status = EveUiTrackerStatus::Stopped;
+            
+            info!("Tracker for process: {:?} finished", process);
+        });
         
+        self.handles.insert(process, handle);
         
     }
     
-    fn extract_ui_from_process(process: u32) {
+
+    pub fn stop_tracker(&mut self, process: u32){
+        let handle = self.handles.remove(&process);
+
+        if handle.is_none() {
+            self.send_error(process, "Tracker not found".to_string());
+            return;
+        }
+
+        let handle = handle.unwrap();
+        
+        handle.join().unwrap();
+
+        let eve_status = self.eve_ui_status.get_mut(&process).unwrap();
+
+        eve_status.status = EveUiTrackerStatus::Stopped;
+
+        self.send_event(process);
+    }
+    
+    fn modify_eve_ui_status(&mut self,
+                            process: u32, 
+                            general_window: GeneralWindow){
+
+        let eve_status = self.eve_ui_status.get_mut(&process).unwrap();
+        
+        eve_status.general_window = Some(to_string(&general_window).unwrap());
+        
+    }
+    
+    fn modify_eve_duration_processing(&mut self,
+                                        process: u32,
+                                        ms_processing: u32){
+            let eve_status = self.eve_ui_status.get_mut(&process).unwrap();
+            
+            eve_status.ms_processing = ms_processing;
+        
+    }
+
+    fn send_event(&mut self, process: u32){
+
+        let eve_status = self.eve_ui_status.get(&process).unwrap();
+        
+        self.window.emit("eve_ui_status", eve_status).unwrap();
+    }
+    
+    fn extract_ui_from_process(&mut self, process: u32) {
 
         let time_per_second: i32 = 2;
         let interval = Duration::from_secs_f64(1.0 / time_per_second as f64);
@@ -59,6 +150,7 @@ impl EveUiTracker {
         let ui_tree_address = extract_ui_tree_address(process);
 
         if ui_tree_address.is_err() {
+            self.send_error(process, "Could not find ui tree address".to_string());
             info!("Could not find ui tree address");
             return;
         }
@@ -68,10 +160,12 @@ impl EveUiTracker {
         let mut count = 0;
 
         let mut last_print_time = Instant::now();
-
-
-
+        
         let ui_tree_node_extractor = UiTreeNodeExtractor::new(process);
+        
+        //let mut gui_simulation = GuiSimulation::new(process);
+        
+        //gui_simulation.activate_key(0x56, Duration::from_secs(2));
 
         loop {
             let start = Instant::now();
@@ -84,11 +178,16 @@ impl EveUiTracker {
 
             let ui_tree = ui_tree.unwrap();
             let zones_with_ui = ui_tree.1;
-
-            let overview_windows = GeneralWindow::parse_general_window(zones_with_ui);
+            
+            let general_window = GeneralWindow::parse_general_window(zones_with_ui.clone());
+            
+            self.modify_eve_ui_status(process, general_window);
 
             //let types = ui_tree.0.ui_node.extract_types();
 
+           // let json = serde_json::to_string(&zones_with_ui.get(&UiZonesEnum::ProbeScanner)).unwrap();
+
+           // fs::write("archivo.txt", json).expect("TODO: panic message");
 
             count += 1;
             total_duration += duration;
@@ -114,6 +213,8 @@ impl EveUiTracker {
 
                 last_print_time = Instant::now();
             }
+            
+            self.send_event(process);
             
             if (duration < interval) {
                 thread::sleep(interval - duration);

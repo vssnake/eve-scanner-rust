@@ -39,6 +39,8 @@ impl UiConstants {
 #[derive(Hash, Eq, PartialEq, Debug, Clone)]
 pub enum UiZonesEnum {
     Overview,
+    DirectionalScanner,
+    ProbeScanner,
 }
 
 lazy_static! {
@@ -48,6 +50,8 @@ lazy_static! {
         hash_map.insert("OverView", UiZonesEnum::Overview);
         hash_map.insert("OverviewWindow", UiZonesEnum::Overview);
         hash_map.insert("OverviewWindowOld", UiZonesEnum::Overview);
+        hash_map.insert("DirectionalScanner", UiZonesEnum::DirectionalScanner);
+        hash_map.insert("ProbeScannerWindow", UiZonesEnum::ProbeScanner);
         hash_map
     };
     

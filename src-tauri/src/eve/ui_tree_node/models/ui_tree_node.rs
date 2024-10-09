@@ -1,18 +1,39 @@
 ﻿use std::any::Any;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use log::debug;
+use serde::ser::SerializeMap;
+use serde::Serialize;
 use crate::eve::ui_tree_node::common::common::ColorComponents;
 use crate::eve::ui_tree_node::models::child_of_node::{ChildWithRegion, ChildWithoutRegion};
 use crate::eve::ui_tree_node::models::display_region::DisplayRegion;
 
-#[derive(Debug)]
+#[derive(Debug,Serialize)]
 pub struct UiTreeNode {
     pub object_address: u64,
     pub object_type_name: String,
+    #[serde(serialize_with = "serialize_dict_entries")]
     pub dict_entries_of_interest: HashMap<String, Rc<Box<dyn Any>>>,
+    #[serde(skip)]
     pub other_dict_entries_keys: Vec<String>,
     pub children: Vec<Rc<UiTreeNode>>,
+}
+
+fn serialize_dict_entries<S>(
+    entries: &HashMap<String, Rc<Box<dyn Any>>>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    let mut map = serializer.serialize_map(Some(entries.len()))?;
+    for (key, value) in entries {
+        // Intentamos hacer un downcast a String, si es posible lo incluimos
+        if let Some(val) = value.downcast_ref::<String>() {
+            map.serialize_entry(key, val)?;
+        }
+    }
+    map.end()
 }
 
 impl UiTreeNode {
@@ -27,14 +48,18 @@ impl UiTreeNode {
     }
     
     pub fn extract_types(&self) -> Vec<String> {
-        let mut types = Vec::new();
-        types.push(self.object_type_name.clone());
+        let mut types = HashSet::new();
+        types.insert(self.object_type_name.clone());
 
         for child in &self.children {
             types.extend(child.extract_types());
         }
 
-        types
+        let mut vec: Vec<String> = types.iter().cloned().collect();
+        
+        vec.sort();
+        
+        vec
     }
 
 
@@ -69,7 +94,7 @@ impl UiTreeNode {
         descendants
     }
 
-    pub fn get_display_text(ui_node: Rc<UiTreeNode>) -> String {
+    pub fn get_display_text(ui_node: &Rc<UiTreeNode>) -> String {
         let keys_to_search = vec!["_setText", "_text"];
         let mut longest_text = String::new();
 
@@ -101,13 +126,18 @@ impl UiTreeNode {
         longest_text
     }
 }
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct UITreeNodeWithDisplayRegion {
     pub ui_node: Rc<UiTreeNode>,
+    #[serde(skip)]
     pub child_with_region: Vec<Rc<ChildWithRegion>>,
+    #[serde(skip)]
     pub child_without_region: Vec<Rc<ChildWithoutRegion>>,
+    #[serde(skip)]
     pub self_display_region: Rc<DisplayRegion>,
+    #[serde(skip)]
     pub total_display_region: Rc<DisplayRegion>,
+    #[serde(skip)]
     pub total_display_region_visible: DisplayRegion,
 }
 

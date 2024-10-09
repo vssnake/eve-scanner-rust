@@ -2,27 +2,16 @@
 // This starter template is using Vue 3 <script setup> SFCs
 // Check out https://vuejs.org/api/sfc-script-setup.html#script-setup
 import Greet from "./components/Greet.vue";
+import EveProcess from "./components/EveProcessComponent.vue";
+import EveBotScreen from "./components/EveBotScreen.vue";
+import Divider from 'primevue/divider';
 </script>
 
 <template>
   <div class="container">
-    <h1>Welcome to Tauri!</h1>
-
-    <div class="row">
-      <a href="https://vitejs.dev" target="_blank">
-        <img src="/vite.svg" class="logo vite" alt="Vite logo"/>
-      </a>
-      <a href="https://tauri.app" target="_blank">
-        <img src="/tauri.svg" class="logo tauri" alt="Tauri logo"/>
-      </a>
-      <a href="https://vuejs.org/" target="_blank">
-        <img src="./assets/vue.svg" class="logo vue" alt="Vue logo"/>
-      </a>
-    </div>
-
-    <p>Click on the Tauri, Vite, and Vue logos to learn more.</p>
-
-    <Greet/>
+    <EveProcess/>
+    <Divider layout="horizontal" />
+    <EveBotScreen/>
   </div>
 </template>
 
@@ -53,11 +42,11 @@ import Greet from "./components/Greet.vue";
 
 .container {
   margin: 0;
-  padding-top: 10vh;
   display: flex;
   flex-direction: column;
-  justify-content: center;
   text-align: center;
+  width: 97vw;
+  height: 97vh;
 }
 
 .logo {
@@ -145,6 +134,10 @@ button {
   button:active {
     background-color: #0f0f0f69;
   }
+}
+
+div >>> .p-divider-horizontal {
+  margin: 0.5rem 0px;
 }
 
 </style>

@@ -1,21 +1,24 @@
 ﻿use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
+use serde::Serialize;
 use crate::eve::ui_tree_node::common::common::ColorComponents;
-use crate::eve::ui_tree_node::models::child_of_node::ChildWithRegion;
 use crate::eve::ui_tree_node::models::ui_tree_node::{ScrollControls, UITreeNodeWithDisplayRegion};
 use crate::eve::ui_tree_node::ui_constants::{UiZonesEnum, UI_ZONES};
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct OverviewWindow {
+    #[serde(skip_serializing)]
     pub ui_node: Rc<UITreeNodeWithDisplayRegion>,
+    #[serde(skip_serializing)]
     pub entries_headers: Vec<(String, Rc<UITreeNodeWithDisplayRegion>)>,
     pub entries: Vec<OverviewWindowEntry>,
+    #[serde(skip_serializing)]
     pub scroll_controls: Option<ScrollControls>,
 }
 
 impl OverviewWindow {
     pub fn parse_overview_windows(
-        zones: HashMap<UiZonesEnum, Vec<Rc<UITreeNodeWithDisplayRegion>>>,
+        zones: &HashMap<UiZonesEnum, Vec<Rc<UITreeNodeWithDisplayRegion>>>,
     ) -> Vec<Rc<OverviewWindow>> {
         let overview_windows = zones.get(&UiZonesEnum::Overview).unwrap();
         let overview_windows_with_region = overview_windows
@@ -32,13 +35,14 @@ impl OverviewWindow {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct OverviewWindowEntry {
+    #[serde(skip_serializing)]
     pub ui_node: Rc<UITreeNodeWithDisplayRegion>,
     pub texts_left_to_right: Vec<String>,
     pub cells_texts: HashMap<String, String>,
     pub object_distance: Option<String>,
-    pub object_distance_in_meters: i32,
+    pub object_distance_in_meters: Option<i32>,
     pub object_name: Option<String>,
     pub object_type: Option<String>,
     pub object_alliance: Option<String>,
@@ -51,7 +55,7 @@ pub struct OverviewWindowEntry {
     pub opacity_percent: Option<i32>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct OverviewWindowEntryCommonIndications {
     pub targeting: bool,
     pub targeted_by_me: bool,

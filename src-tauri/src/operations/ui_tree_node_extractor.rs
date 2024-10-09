@@ -8,7 +8,6 @@ use std::any::Any;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use log::debug;
 use crate::eve::ui_tree_node::models::child_of_node::{ChildWithRegion, ChildWithoutRegion};
 use crate::eve::ui_tree_node::models::display_region::DisplayRegion;
 use crate::eve::ui_tree_node::models::ui_tree_node::{UITreeNodeWithDisplayRegion, UiTreeNode};
@@ -37,6 +36,7 @@ impl UiTreeNodeExtractor {
         address: u64,
         max_depth: i32,
     ) -> Result<(Rc<UITreeNodeWithDisplayRegion>,HashMap<UiZonesEnum, Vec<Rc<UITreeNodeWithDisplayRegion>>>), &'static str> {
+        self.memory_reading_cache.clear();
         let children_with_zones: RefCell<
             HashMap<UiZonesEnum, Vec<Rc<UITreeNodeWithDisplayRegion>>>,
         > = RefCell::new(UiConstants::initialize_mapper());

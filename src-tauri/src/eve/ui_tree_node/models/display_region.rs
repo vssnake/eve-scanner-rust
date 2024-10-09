@@ -1,4 +1,6 @@
-﻿#[derive(Debug, Clone)]
+﻿use serde::Serialize;
+
+#[derive(Debug, Clone, Serialize)]
 pub struct DisplayRegion {
     pub x: i32,
     pub y: i32,

@@ -1,5 +1,7 @@
 ﻿pub mod common {
-    #[derive(Debug, Clone)]
+    use serde::Serialize;
+
+    #[derive(Debug, Clone, Serialize)]
     pub struct ColorComponents {
         pub alpha: i32,
         pub red: i32,
@@ -8,7 +10,7 @@
     }
 
 
-    #[derive(Debug)]
+    #[derive(Debug, Serialize)]
     pub struct Bunch {
         pub entries_of_interest: serde_json::Map<String, serde_json::Value>,
     }

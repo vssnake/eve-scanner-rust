@@ -9,6 +9,7 @@ pub struct MemoryReadingCache {
     dict_entry_value_representation: Rc<RefCell<HashMap<u64, Rc<Box<dyn std::any::Any>>>>>,
 }
 
+
 impl MemoryReadingCache {
     pub fn new() -> Self {
         Self {
@@ -16,6 +17,12 @@ impl MemoryReadingCache {
             python_string_value_max_length_4000: Rc::new(RefCell::new(HashMap::new())),
             dict_entry_value_representation: Rc::new(RefCell::new(HashMap::new())),
         }
+    }
+
+    pub fn clear(&self) {
+        self.python_string_value_max_length_4000.borrow_mut().clear();
+        self.python_type_name_from_python_object_address.borrow_mut().clear();
+        self.dict_entry_value_representation.borrow_mut().clear();
     }
 
     pub fn get_python_type_name_from_python_object_address<F>(&self, address: u64, get_fresh: F) -> Option<String>

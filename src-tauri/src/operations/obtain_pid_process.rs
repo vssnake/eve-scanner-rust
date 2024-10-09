@@ -15,8 +15,6 @@ impl ObtainPidProcess {
             }
         }
         
-        return  Ok(processes);
-
-        Err(format!("Process {} not found", process_name))
+        Ok(processes)
     }
 }

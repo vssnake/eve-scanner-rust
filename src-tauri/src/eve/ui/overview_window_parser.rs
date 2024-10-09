@@ -9,6 +9,8 @@ use std::rc::Rc;
 use crate::eve::ui_tree_node::common::common::ColorComponents;
 use crate::eve::ui_tree_node::models::child_of_node::ChildWithRegion;
 
+rust_i18n::i18n!("locales");
+
 impl OverviewWindow {
     pub fn parse(overview_window_node: Rc<UITreeNodeWithDisplayRegion>) -> OverviewWindow {
         let descendant_display_region = DisplayRegionUtils::list_descendants_with_display_region(
@@ -77,7 +79,7 @@ impl OverviewWindow {
             .get(t!("distance").as_ref())
             .map(|s| s.to_string());
         let object_distance_in_meters =
-            ParserUtils::parse_overview_entry_distance_in_meters_from_text(&object_distance);
+            ParserUtils::parse_distance_in_meters_from_text(&object_distance);
         
         let object_name = list_view_entry
             .get(t!("name").as_ref())
@@ -122,14 +124,15 @@ impl OverviewWindow {
         let icon_sprite_color_percent = Self::get_icon_sprite_color_perfect(&space_object_icon_descendants);
 
         let is_player = Self::is_player(space_object_icon_descendants);
-
-        let names_under_space_object_icon: HashSet<String> =
-            UiTreeNode::list_descendants_in_ui_tree_node(
-                &space_object_icon_node.unwrap().node.ui_node,
-            )
-            .into_iter()
-            .filter_map(|descendant| ParserUtils::get_name_from_dict_entries(&descendant))
-            .collect();
+        
+        let names_under_space_object_icon = if let Some(space_object_icon_node) = &space_object_icon_node {
+            UiTreeNode::list_descendants_in_ui_tree_node(&space_object_icon_node.node.ui_node)
+                .into_iter()
+                .filter_map(|descendant| ParserUtils::get_name_from_dict_entries(&descendant))
+                .collect()
+        } else {
+            HashSet::new()
+        };
         
         let common_indications = Self::extract_common_indicators(&names_under_space_object_icon, &right_aligned_icons_hints);
         

@@ -2,6 +2,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use regex::Regex;
 use crate::eve::ui_tree_node::common::common::ColorComponents;
 use crate::eve::ui_tree_node::models::display_region::DisplayRegion;
 use crate::eve::ui_tree_node::models::ui_tree_node::{ScrollControls, UITreeNodeWithDisplayRegion, UiTreeNode};
@@ -72,7 +73,7 @@ impl ParserUtils {
 
             for descendant in descendant_children {
                 
-                let display_text = UiTreeNode::get_display_text(descendant.node.ui_node.clone());
+                let display_text = UiTreeNode::get_display_text(&descendant.node.ui_node);
                 if !display_text.is_empty() {
                     result.push((display_text, descendant.node.clone()));
                 }
@@ -101,12 +102,12 @@ impl ParserUtils {
         }
     }
 
-    pub fn parse_overview_entry_distance_in_meters_from_text(
+    pub fn parse_distance_in_meters_from_text(
         distance_display_text_before_trim: &Option<String>,
-    ) -> i32 {
+    ) -> Option<i32> {
         
         if (distance_display_text_before_trim.is_none()) {
-            return -1;
+            return None;
         }
 
         let trimmed = distance_display_text_before_trim
@@ -116,7 +117,7 @@ impl ParserUtils {
         
         let parts: Vec<&str> = trimmed.split_whitespace().collect();
         if parts.len() < 2 {
-            return -1;
+            return None;
         }
 
         let unit_text = parts[parts.len() - 1];
@@ -125,17 +126,18 @@ impl ParserUtils {
         let unit_in_meters = ParserUtils::parse_distance_unit_in_meters(unit_text);
         if unit_in_meters.is_none() {
             // Too far away
-            return -1;
+            return None;
         }
 
         let number_text = number_text_parts.join(" ");
         let number = ParserUtils::parse_number_truncating_after_optional_decimal_separator(&number_text);
         
         if number.is_err(){
-            return  -1
+            return  None
         }
+        
 
-        number.unwrap() * unit_in_meters.unwrap()
+        number.unwrap().checked_mul(unit_in_meters.unwrap())
     }
     
     fn parse_distance_unit_in_meters(unit_text: &str) -> Option<i32> {
@@ -193,6 +195,15 @@ impl ParserUtils {
            // }
         }
         None
+    }
+
+    pub(crate) fn extract_localized_name(text: &str) -> Option<String> {
+        let re = Regex::new(r#"<localized.*?>(.*?)</localized>"#).unwrap();
+        if let Some(captures) = re.captures(text) {
+            captures.get(1).map(|m| m.as_str().to_string())
+        } else {
+            None
+        }
     }
     
     

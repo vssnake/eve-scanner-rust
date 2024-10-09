@@ -3,6 +3,7 @@ use lazy_static::lazy_static;
 use std::any::Any;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
+use std::result;
 use crate::eve::ui_tree_node::models::ui_tree_node::{UITreeNodeWithDisplayRegion, UiTreeNode};
 
 pub struct UiUtils;
@@ -22,7 +23,7 @@ impl UiUtils {
             .dict_entries_of_interest
             .get(property_name);
 
-        if (property_to_convert_option.is_none()) {
+        if property_to_convert_option.is_none() {
             return None;
         }
 
@@ -36,6 +37,29 @@ impl UiUtils {
 
     pub fn node_occludes_following_nodes(node: &UITreeNodeWithDisplayRegion) -> bool {
         PYTHON_OBJECT_TYPES_KNOWN_TO_OCCLUDE.contains(node.ui_node.object_type_name.as_str())
+    }
+    
+    pub fn find_node_in_tree(
+        final_node_type: &String,
+        parent_node: Rc<UITreeNodeWithDisplayRegion>,
+    ) -> Option<Rc<UITreeNodeWithDisplayRegion>> {
+        
+        if *final_node_type == parent_node.ui_node.object_type_name {
+            return Some(parent_node);
+        }
+
+        for child in parent_node.child_with_region.iter() {
+            
+            let result =  UiUtils::find_node_in_tree(
+                final_node_type,
+                child.node.clone());
+            
+            if result.is_some() {
+                return result;
+            }
+        }
+
+        None
     }
 }
 

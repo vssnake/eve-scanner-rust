@@ -12,21 +12,22 @@ name = "tauri_app_lib"
 crate-type = ["lib", "cdylib", "staticlib"]
 
 [build-dependencies]
-tauri-build = { version = "2.0.0-rc", features = [] }
+tauri-build = { version = "2.0.1", features = [] }
 
 [dependencies]
-tauri = { version = "2.0.0-rc", features = [] }
-tauri-plugin-shell = "2.0.0-rc"
+tauri = { version = "2.0.2", features = ["unstable"] }
+tauri-plugin-shell = "2.0.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 bitflags = "2.6.0"
 log = "0.4.22"
-sysinfo = "0.31.2"
+sysinfo = "0.32.0"
 rayon = "1.10.0"
 lazy_static = { version = "1.5.0", features = [] }
 env_logger = "0.11.5"
 simple_logger = "5.0.0"
 rust-i18n = "3"
+regex = "1"
 # `bundled` causes us to automatically compile and link in an up to date
 # version of SQLite for you. This avoids many common build issues, and
 # avoids depending on the version of SQLite on the users system (or your
