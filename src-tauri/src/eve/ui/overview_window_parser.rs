@@ -6,10 +6,17 @@ use crate::eve::ui_tree_node::models::ui_tree_node::{UITreeNodeWithDisplayRegion
 use crate::eve::ui_tree_node::utils::display_region_utils::DisplayRegionUtils;
 use std::collections::HashSet;
 use std::rc::Rc;
+use log::debug;
 use crate::eve::ui_tree_node::common::common::ColorComponents;
 use crate::eve::ui_tree_node::models::child_of_node::ChildWithRegion;
 
 rust_i18n::i18n!("locales");
+
+const FLAG_ICON_POSITIVE: &str = "/UI/Texture/classes/FlagIcon/8/3.png";
+const FLAG_ICON_NEGATIVE: &str = "/UI/Texture/classes/FlagIcon/8/4.png";
+
+const FLAG_ICON_NEUTRAL: &str = "/UI/Texture/classes/FlagIcon/8/5.png";
+const FLAG_ICON_CRIMINAL: &str = "/UI/Texture/classes/FlagIcon/8/6.png";
 
 impl OverviewWindow {
     pub fn parse(overview_window_node: Rc<UITreeNodeWithDisplayRegion>) -> OverviewWindow {
@@ -223,6 +230,19 @@ impl OverviewWindow {
         icon_sprite_color_percent
     }
 
+
+
+    fn contains_flag_icon(s: &str) -> bool {
+        const FLAG_ICONS: [&str; 4] = [
+            &FLAG_ICON_POSITIVE,
+            FLAG_ICON_NEGATIVE,
+            FLAG_ICON_NEUTRAL,
+            FLAG_ICON_CRIMINAL,
+        ];
+
+        FLAG_ICONS.iter().any(|&icon| s.contains(icon))
+    }
+
     fn is_player(space_object_icon_descendants: Option<Vec<Rc<ChildWithRegion>>>) -> bool {
         if space_object_icon_descendants.is_none() {
             return false;
@@ -230,7 +250,23 @@ impl OverviewWindow {
         let is_player = space_object_icon_descendants.unwrap()
             .iter()
             .any(|child_with_region| {
-                child_with_region.node.ui_node.object_type_name == "FlagIconWithState"
+                if (child_with_region.node.ui_node.object_type_name == "FlagIconWithState"){
+                    return child_with_region.node.child_with_region.iter().any(|child_with_region| {
+                        let binding = ParserUtils::get_string_property_from_dict_entries(&child_with_region.node.ui_node, "_texturePath");
+                        let texture_option = binding.as_deref();
+                        
+                        if (texture_option.is_some()){
+                            let texture = texture_option.unwrap();
+                            
+                            if Self::contains_flag_icon(texture)  {
+                                return  true;
+                            }
+                        }
+                        return  false;
+                    });
+                }
+                return  false;
+                    
             });
         is_player
     }

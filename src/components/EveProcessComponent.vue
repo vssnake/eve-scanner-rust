@@ -7,25 +7,27 @@ import router from "../router";
 
 const eve_processes = ref<Array<EveProcessModel>>([]);
 
-//eve_processes.value = [new EveProcessModel(1, 'Eve Process 1'), new EveProcessModel(2, 'Eve Process 2')];
 listen<number[]>('processes', (event) => {
-  //console.log('Received processes', event.payload);
   eve_processes.value = event.payload.map(pid => new EveProcessModel(pid, ''));
 });
 
 
-// Watch para detectar si el array está vacío
 watch(eve_processes, (newVal) => {
   if (newVal.length === 0) {
-    router.push('/eveProcess/'); // Aquí puedes personalizar la ruta
+    router.push('/eveProcess/'); 
   }
 });
+
+const activeTab = ref(0); // Índice de la pestaña activa
+
+function onTabChange(newValue: number) {
+  activeTab.value = newValue;
+}
 </script>
 
 <template>
   <div class="container-eve-process">
-    
-    <Tabs>
+    <Tabs :value="activeTab" @update:value="onTabChange">
       <TabList>
         <Tab v-for="eve_process in eve_processes" :key=eve_process.pid  :value="eve_process.pid">
           <router-link class="container-eve-process" :to="`/eveProcess/${eve_process.pid}`">

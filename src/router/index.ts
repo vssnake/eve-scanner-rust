@@ -1,5 +1,4 @@
 ﻿import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router';
-import EveProcessComponent from '../components/EveProcessComponent.vue';
 import EveBotScreen from "../components/EveBotScreen.vue";
 
 const routes: Array<RouteRecordRaw> = [
@@ -10,7 +9,6 @@ const routes: Array<RouteRecordRaw> = [
     },
 ];
 
-// Crea una nueva instancia del router
 const router = createRouter({
     history: createWebHistory(),
     routes,
@@ -21,12 +19,12 @@ router.beforeEach((to, from, next) => {
     next();
 });
 
-router.beforeResolve((to, from, next) => {
+router.beforeResolve((to, _, next) => {
     console.log(`Resolviendo la ruta: ${to.fullPath}`);
     next();
 });
 
-router.afterEach((to, from) => {
+router.afterEach((to, _) => {
     console.log(`Navegación completa hacia ${to.fullPath}`);
 });
 

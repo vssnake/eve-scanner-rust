@@ -2,10 +2,10 @@
 use std::{fs, process, thread};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::AtomicBool;
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
-use log::{error, info};
-use serde::Serialize;
+use log::{debug, error, info};
 use serde_json::to_string;
 use tauri::{Emitter, Window};
 use crate::db;
@@ -18,12 +18,13 @@ use crate::operations::extract_possible_root_address::ExtractPossibleRootAddress
 use crate::operations::gui_simulation::GuiSimulation;
 use crate::operations::obtain_pid_process::ObtainPidProcess;
 use crate::operations::ui_tree_node_extractor::UiTreeNodeExtractor;
+use serde::Serialize;
 
 #[derive(Debug)]
 pub struct EveUiTracker {
-    handles: HashMap<u32,JoinHandle<()>>,
     eve_ui_status: HashMap<u32,EveUiStatus>,
-    window: Arc<Window>
+    running: Arc<AtomicBool>,
+    window: Arc<Mutex<Window>>
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -43,10 +44,10 @@ pub struct EveUiStatus {
 
 impl EveUiTracker {
     
-    pub fn new(window: Arc<Window>) -> Self {
+    pub fn new(window: Arc<Mutex<Window>>, running: Arc<AtomicBool>) -> Self {
         EveUiTracker {
-            handles: HashMap::new(),
             eve_ui_status: HashMap::new(),
+            running,
             window
         }
     }
@@ -59,8 +60,10 @@ impl EveUiTracker {
         self.send_event(process);
     }
    
-    pub fn start_tracker(&mut self, process: u32,tracker: Arc<Mutex<Self>>) {
-        let cloned_tracker = Arc::clone(&tracker);
+    pub fn start_tracker(&mut self, process: u32) {
+        
+        
+        self.running.store(true, std::sync::atomic::Ordering::Relaxed);
 
         self.eve_ui_status.insert(process, EveUiStatus {
             process_id: process,
@@ -70,45 +73,27 @@ impl EveUiTracker {
             ms_processing: 0
         });
 
-        let handle =thread::spawn(move || {
-            
-            
-            info!("Starting tracker for process: {:?}", process);
-
-            let mut this = cloned_tracker.lock().unwrap();
-
-            this.extract_ui_from_process(process);
-
-            let eve_status = this.eve_ui_status.get_mut(&process).unwrap();
-
-            eve_status.status = EveUiTrackerStatus::Running;
-
-            this.handles.remove(&process);
-
-            let eve_status = this.eve_ui_status.get_mut(&process).unwrap();
-
-            eve_status.status = EveUiTrackerStatus::Stopped;
-            
-            info!("Tracker for process: {:?} finished", process);
-        });
+        info!("Starting tracker for process: {:?}", process);
         
-        self.handles.insert(process, handle);
+        
+        self.extract_ui_from_process(process);
+
+
+        let eve_status = self.eve_ui_status.get_mut(&process).unwrap();
+
+        eve_status.status = EveUiTrackerStatus::Running;
+
+        self.stop_tracker(process);
+
+        info!("Tracker for process: {:?} finished", process);
         
     }
     
 
-    pub fn stop_tracker(&mut self, process: u32){
-        let handle = self.handles.remove(&process);
+    fn stop_tracker(&mut self, process: u32){
 
-        if handle.is_none() {
-            self.send_error(process, "Tracker not found".to_string());
-            return;
-        }
-
-        let handle = handle.unwrap();
+        info!("the handle to stop");
         
-        handle.join().unwrap();
-
         let eve_status = self.eve_ui_status.get_mut(&process).unwrap();
 
         eve_status.status = EveUiTrackerStatus::Stopped;
@@ -138,11 +123,14 @@ impl EveUiTracker {
     fn send_event(&mut self, process: u32){
 
         let eve_status = self.eve_ui_status.get(&process).unwrap();
-        
-        self.window.emit("eve_ui_status", eve_status).unwrap();
+
+        {
+            let mut window = self.window.lock().unwrap();
+            window.emit("eve_ui_status", eve_status).unwrap();
+        }
     }
     
-    fn extract_ui_from_process(&mut self, process: u32) {
+    fn extract_ui_from_process(&mut self, process: u32){
 
         let time_per_second: i32 = 2;
         let interval = Duration::from_secs_f64(1.0 / time_per_second as f64);
@@ -168,6 +156,10 @@ impl EveUiTracker {
         //gui_simulation.activate_key(0x56, Duration::from_secs(2));
 
         loop {
+            
+            if (self.running.load(std::sync::atomic::Ordering::Relaxed) == false) {
+                return;
+            }
             let start = Instant::now();
 
             let ui_tree = ui_tree_node_extractor.extract_ui_tree_from_address(ui_tree_address.unwrap(), 99);

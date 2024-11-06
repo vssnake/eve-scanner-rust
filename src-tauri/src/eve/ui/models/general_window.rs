@@ -7,7 +7,7 @@ use crate::eve::ui::models::probe_scanner::ProbeScanner;
 use crate::eve::ui_tree_node::models::ui_tree_node::UITreeNodeWithDisplayRegion;
 use crate::eve::ui_tree_node::ui_constants::UiZonesEnum;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct GeneralWindow {
     pub overview_windows: Vec<Rc<OverviewWindow>>,
     pub directional_scanner: Option<Rc<DirectionalScanner>>,

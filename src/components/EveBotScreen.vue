@@ -1,42 +1,29 @@
 ﻿<script setup lang="ts">
-import {defineComponent, ref, watch} from 'vue';
+import { ref, watch} from 'vue';
 import { useRoute } from 'vue-router';
-import {listen} from "@tauri-apps/api/event";
-import {EveProcessModel} from "../models/EveProcessModel.ts";
-import {invoke} from "@tauri-apps/api/core";
+import {UiManager} from "../features/eveui/UiManager.ts";
 
-const route = useRoute(); // Accedemos a la instancia de la ruta
-const id = ref(route.params.id); // Extraemos el parámetro "id" de la ruta
+const route = useRoute(); 
+const id = ref<string>(route.params.id as string);
 
-watch(() => route.params.id, (newId) => {
+
+
+watch(() => route.params.id as string, (newId) => {
   id.value = newId;
 });
 
-listen<any>('eve_ui_status', (event) => {
-  console.log('Received status', event.payload);
+const ui_manager = new UiManager();
 
-});
+
 
 const startTracker = () => {
-  const pid = id.value as number;
-  invoke('start_tracker', { pid } )
-      .then((response) => {
-        console.log("Respuesta desde Rust:", response);
-      })
-      .catch((error) => {
-        console.error("Error invocando el comando en Rust:", error);
-      });
+  const pid = Number(id.value);
+  ui_manager.startTracker(pid);
 };
 
 const stopTracker = () => {
-  const pid = id.value as number;
-  invoke('stop_tracker', { pid } )
-      .then((response) => {
-        console.log("Respuesta desde Rust:", response);
-      })
-      .catch((error) => {
-        console.error("Error invocando el comando en Rust:", error);
-      });
+  const pid = Number(id.value);
+  ui_manager.stopTracker(pid);
 };
 </script>
 
